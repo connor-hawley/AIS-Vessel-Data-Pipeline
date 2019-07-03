@@ -1,0 +1,9 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+/AIS_ASCII_by_UTM_Month/*
+
+.DS_Store
+.idea
