@@ -3,9 +3,13 @@
 import os
 import csv
 import math
+import datetime
+import numpy as np
+import matplotlib.pyplot as plt
+
 
 # set number of rows to read of each CSV file since reading > 3 GB is going to take forever
-MAX_ROWS = 100000
+MAX_ROWS = 10000
 # sets the side length of the square being used to discretize the grid, in degrees
 grid_len = 0.1
 # specifies output file name (should be .csv)
@@ -15,12 +19,9 @@ out_header = ['sequence_id', 'from_state_id', 'action_id', 'to_state_id']
 
 # row indices to be accessed later in case other data does not have same row order
 ind_mmsi = 0
+ind_time = 1
 ind_lat = 2
 ind_lon = 3
-
-# UTM zones exclude values outside 84 N latitude and 80 S latitude
-global_min_lat = -80
-global_max_lat = 84.
 
 
 def get_bounds(zone):
@@ -41,6 +42,16 @@ def get_meta_data(file_name):
     zone_data = zone_raw[-2:] # gets last 2 characters of "ZoneXX" string - will be the zone number
     zone = int(zone_data)
     return year, month, zone
+
+
+def get_time(time_str):
+    # uses the datetime library to calculate a timestamp and returns it
+    date, time = time_str.split('T')
+    year, month, day = date.split('-')
+    hour, minute, second = time.split(':')
+    dt = datetime.datetime(int(year), int(month), int(day), hour=int(hour), minute=int(minute), second=int(second),
+                           tzinfo=datetime.timezone.utc)
+    return dt.timestamp()
 
 
 def get_state(cur_lat, cur_lon, min_lat, min_lon, num_cols, grid_len):
@@ -84,7 +95,7 @@ def get_action(prev_state, cur_state, num_cols):
         elif x == i and y < 0:
             y += 1
         action_num += 1
-        print('x: {}, y: {}, action_num: {}'.format(x, y, action_num))
+        # print('x: {}, y: {}, action_num: {}'.format(x, y, action_num))
 
     return action_num
 
@@ -100,12 +111,12 @@ for root, dirs, files in os.walk(dir_data):
 # initialize dictionary that will be filled with all trajectories
 trajectories = {}
 # min_lat and min_lon will keep track of the maximum and minimum longitudes in the dataset over all csvs
-min_lat = global_max_lat
-max_lat = global_min_lat
+min_lat = 90
+max_lat = -90
 # these lists will keep track of minimum and maximum longitudes for all the zones seen
 # minimum of minimum longitudes and maximum of maximum longitudes will be used for final grid
-min_lons = []
-max_lons = []
+min_lons = 180
+max_lons = -180
 
 # iterate through each csv_file to build trajectories
 for csv_file in csv_files:
@@ -113,9 +124,6 @@ for csv_file in csv_files:
     year, month, zone = get_meta_data(csv_file)  # finds the data year, month, and zone based on the file name
     print('year: {}, month: {}, zone: {}'.format(year, month, zone))
     min_lon, max_lon = get_bounds(zone)  # finds longitude boundaries based on the zone number
-    # keeps track of longitude minima and maxima across files
-    min_lons.append(min_lon)
-    max_lons.append(max_lon)
     with open(csv_file, 'r') as fh:  # boilerplate to read in csv file
         reader = csv.reader(fh)
         header = reader.__next__()  # retrieves header of csv
@@ -126,18 +134,19 @@ for csv_file in csv_files:
             mmsi = row[ind_mmsi]  # gets current id, latitude, and longitude of column
             cur_lat = float(row[ind_lat])
             cur_lon = float(row[ind_lon])
+            cur_sec = get_time(row[ind_time])
             if not (mmsi in trajectories):  # create new trajectory for unseen mmsi
                 trajectories[mmsi] = []
-            trajectories[mmsi].append([cur_lat, cur_lon])  # add state to mmsi's trajectory
-            # finds minimum and maximum latitude in dataset for later grid sizing
+            trajectories[mmsi].append([cur_lat, cur_lon, cur_sec])  # add state to mmsi's trajectory
+            # finds minimum and maximum latitudes and longitudes in dataset for later grid sizing
             if cur_lat > max_lat:
                 max_lat = cur_lat
             elif cur_lat < min_lat:
                 min_lat = cur_lat
-
-# minimum and maximum longitude for final grid
-min_lon = min(min_lons)
-max_lon = max(max_lons)
+            if cur_lon > max_lon:
+                max_lon = cur_lon
+            if cur_lon < min_lon:
+                min_lon = cur_lon
 
 # changes grid boundaries to provide some padding to each boundary, rounded to nearest degree
 min_lat = float(math.floor(min_lat))
@@ -152,6 +161,9 @@ print('minimum latitude: {}, maximum latitude: {}'.format(min_lat, max_lat))
 num_cols = math.ceil((max_lon - min_lon)/grid_len)  # number of columns in the resulting grid
 print('number of columns in final grid: {}'.format(num_cols))
 
+# keeps track of time differences in seconds
+d_time = []
+
 # opens output csv file
 with open(out_file, 'w') as output:
     writer = csv.writer(output)
@@ -162,22 +174,42 @@ with open(out_file, 'w') as output:
     # discretize each trajectory now that boundaries of grid are known
     for mmsi, trajectory in trajectories.items():
         print('trajectory for {}: {}'.format(mmsi, trajectory))
+        # checks that trajectory contains more than one entry (otherwise is not trajectory)
+        if len(trajectory) < 2:
+            continue
+        # sorts trajectory based on timestamp - looks like timestamps are out of order
+        trajectory.sort(key=lambda x: x[2])
         cur_state = -1
+        cur_time = -1
         for coords in trajectory:
             cur_lat = coords[0]
             cur_lon = coords[1]
+            # just for time
+            prev_time = cur_time
+            cur_time = coords[2]
             # gets discretized state based on current coordinates, the upper left bound of the grid,
             # the number of columns, and the grid unit length
             prev_state = cur_state
             cur_state = get_state(cur_lat, cur_lon, min_lat, min_lon, num_cols, grid_len)
-            if (prev_state != -1):  # if there is a valid previous state, write a line of the csv
+            if prev_state != -1:  # if there is a valid previous state, write a line of the csv
                 # infers action, implying that the system is deterministic
                 cur_action = get_action(prev_state, cur_state, num_cols)
-                # writes SAS line of csv
-                writer.writerow([i, prev_state, cur_action, cur_state])
-                print('traj: {}, prev: {}, action: {}, cur: {}'.format(i, prev_state, cur_action, cur_state))
+                # writes SAS line of csv if the action is nonzero
+                if cur_action != 0:
+                    writer.writerow([i, prev_state, cur_action, cur_state])
+                    # print('traj: {}, prev: {}, action: {}, cur: {}'.format(i, prev_state, cur_action, cur_state))
+                    # logs time difference between states
+                    if prev_time != -1:
+                        d_time.append(cur_time - prev_time)
         i += 1  # increment i for each trajectory
 
 # TODO: visualize resulting trajectories on matplotlib
+# TODO: looks like plotly is the way to go - Cartopy is utter trash
+'''
+ax = plt.axes(projection=ccrs.PlateCarree())
+ax.coastlines()
+
+plt.show()
+'''
 
 # TODO: convert each step of this process to a Jupyter notebook

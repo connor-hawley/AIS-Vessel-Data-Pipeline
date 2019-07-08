@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 
 /AIS_ASCII_by_UTM_Month/*
+*.csv
 
 .DS_Store
 .idea
