@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # gets AIS data for selected years, months, and zones via wget
 # total 2017 dataset is about 80GB, so a small subset should be manageable on a laptop/desktop environment
 # if only one tuple of year, month, and zone is desired, then use command-line argument './get_raw.sh year month zone'
