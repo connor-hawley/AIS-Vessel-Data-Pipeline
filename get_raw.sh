@@ -12,9 +12,12 @@ CLEAR_BEFORE_DOWNLOAD=true
 
 # changes to specified output directory before downloading the data
 OUTPUT_DIR="./"
+OUTPUT_FILE="AIS_sequence_data"
+if [ ! -d "${OUTPUT_DIR}" ]; then
+    mkdir -p "${OUTPUT_DIR}"
+fi
 cd $OUTPUT_DIR
 
-OUTPUT_FILE="AIS_ASCII_by_UTM_Month"
 
 SITE="https://coast.noaa.gov/htdata/CMSP/AISDataHandler/"
 # NOTE: all begin/end values are inclusive
