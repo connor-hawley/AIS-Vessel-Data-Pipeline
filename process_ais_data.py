@@ -140,12 +140,12 @@ for csv_file in csv_files:
         reader = csv.reader(fh)
         header = next(reader)  # retrieves header of csv
         print('csv header: {}'.format(header))
-        for i in range(MAX_ROWS):
-            try:
-                row = next(reader)  # get new row of the data
-            except StopIteration:
-                break
-        # for row in reader:  # placeholder for complete code
+        #for i in range(MAX_ROWS):
+        #    try:
+        #        row = next(reader)  # get new row of the data
+        #    except StopIteration:
+        #        break
+        for row in reader:  # placeholder for complete code
             mmsi = row[ind_mmsi]  # gets current id, latitude, and longitude of column
             cur_lat = float(row[ind_lat])
             cur_lon = float(row[ind_lon])
