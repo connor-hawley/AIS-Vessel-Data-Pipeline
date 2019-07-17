@@ -23,7 +23,7 @@ The csv files obtained have the following data available:
 # Converting from Git to IRL
 - if the source files from this repository have been moved to the irl repository, then the following changes must be made to each of the source files to change where they source their input and put their output
 ## ``get_raw.sh``
-- set ``OUTPUT_DIR="../../data/AIS_data/AIS_raw_data/"`` 
+- set ``OUTPUT_DIR="../../data/AIS_data/"`` 
 ## ``process_ais_data.py``
 - set ``in_dir="../../data/AIS_data/"``
 - set ``out_dir="../../data/AIS_data/AIS_sequence_data/"``

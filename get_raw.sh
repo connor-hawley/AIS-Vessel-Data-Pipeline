@@ -12,7 +12,7 @@ CLEAR_BEFORE_DOWNLOAD=true
 
 # changes to specified output directory before downloading the data
 OUTPUT_DIR="./"
-OUTPUT_FILE="AIS_sequence_data"
+OUTPUT_FILE="AIS_raw_data"
 if [ ! -d "${OUTPUT_DIR}" ]; then
     mkdir -p "${OUTPUT_DIR}"
 fi
