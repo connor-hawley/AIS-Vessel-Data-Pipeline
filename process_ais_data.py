@@ -4,11 +4,7 @@ import os
 import csv
 import math
 import datetime
-import plotly.plotly as py
-import plotly.graph_objs as go
-
 import pandas as pd
-
 
 # set number of rows to read of each CSV file since reading > 3 GB is going to take forever
 MAX_ROWS = 100000
@@ -16,6 +12,12 @@ MAX_ROWS = 100000
 MIN_STATES = 2
 # sets the side length of the square being used to discretize the grid, in degrees
 grid_len = 0.5
+# specifies the directory where input data is located
+in_dir = './'
+# specifies the folder name containing all the data in the input directory
+in_dir_data = 'AIS_ASCII_by_UTM_Month/'
+# specified the directory where output data files should be written
+out_dir = './'
 # specifies output file name (should be .csv)
 out_file = 'ais_data_output.csv'
 # specifies header row of output csv file
@@ -110,8 +112,7 @@ def get_action(prev_state, cur_state, num_cols):
 
 # traverses the directory containing the decompressed AIS data to get the CSV names for further processing
 csv_files = []
-dir_data = "AIS_ASCII_by_UTM_Month/"
-for root, dirs, files in os.walk(dir_data):
+for root, dirs, files in os.walk(in_dir + in_dir_data):
     for file in files:
         if file.endswith(".csv"):
             # csv_files will contain file locations relative to current directory
@@ -180,7 +181,7 @@ print('number of columns in final grid: {}'.format(num_cols))
 d_time = []
 
 # opens output csv file
-with open(out_file, 'w') as output:
+with open(out_dir + out_file, 'w') as output:
     writer = csv.writer(output)
     # writes header row
     writer.writerow(out_header)
@@ -223,7 +224,7 @@ with open(out_file, 'w') as output:
             i += 1  # increment i for each trajectory that has at least 1 non-self transition
 
 out_meta_data = [grid_len, num_cols, min_lat, max_lat, min_lon, max_lon]
-with open(out_meta, 'w') as output:
+with open(out_dir + out_meta, 'w') as output:
     writer = csv.writer(output)
     # writes header row for metadata file
     writer.writerow(out_meta_header)

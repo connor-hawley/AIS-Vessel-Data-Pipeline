@@ -9,6 +9,11 @@ DELETE_ZIPPED=true
 # specify whether or not to clear files already extracted before downloading new ones
 # TODO: make this smarter so that when CLEAR_BEFORE_DOWNLOAD is false it does not download files already on disk
 CLEAR_BEFORE_DOWNLOAD=true
+
+# changes to specified output directory before downloading the data
+OUTPUT_DIR="./"
+cd $OUTPUT_DIR
+
 OUTPUT_FILE="AIS_ASCII_by_UTM_Month"
 
 SITE="https://coast.noaa.gov/htdata/CMSP/AISDataHandler/"
