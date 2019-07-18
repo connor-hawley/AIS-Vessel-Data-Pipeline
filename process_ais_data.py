@@ -4,14 +4,19 @@ import os
 import csv
 import math
 import datetime
+import numpy as np
 import pandas as pd
 
 # set number of rows to read of each CSV file since reading > 3 GB is going to take forever
-MAX_ROWS = 100000
+MAX_ROWS = 1000000
 # set minimum number of states in a trajectory necessary to qualify it for the output file
 MIN_STATES = 2
 # sets the side length of the square being used to discretize the grid, in degrees
-grid_len = 0.5
+grid_len = 1.0
+# specifies whether or not to use specified hard latitude boundaries instead of inferring them
+bound_lat = True
+# specifies whether to limit actions to adjacent squares using linear interpolation or to allow arbitrary actions
+interp_actions = True  # TODO: implement another method that has just 5 actions instead of 9
 # specifies the directory where input data is located
 in_dir = './'
 # specifies the folder name containing all the data in the input directory
@@ -79,9 +84,9 @@ def get_state(cur_lat, cur_lon, min_lat, min_lon, num_cols, grid_len):
 def get_action(prev_state, cur_state, num_cols):
     # finds action according to spiral rule
     # gets row, column decomposition for previous and current states
-    prev_row = math.floor(prev_state / num_cols)
+    prev_row = prev_state // num_cols
     prev_col = prev_state % num_cols
-    cur_row = math.floor(cur_state / num_cols)
+    cur_row = cur_state // num_cols
     cur_col = cur_state % num_cols
     rel_row = cur_row - prev_row
     rel_col = cur_col - prev_col
@@ -109,6 +114,56 @@ def get_action(prev_state, cur_state, num_cols):
 
     return action_num
 
+def get_interpolated_actions(traj_num, prev_state, cur_state, num_cols):
+    # gets row, column decomposition for previous and current states
+    prev_row = prev_state // num_cols
+    prev_col = prev_state % num_cols
+    cur_row = cur_state // num_cols
+    cur_col = cur_state % num_cols
+    rel_row = cur_row - prev_row
+    rel_col = cur_col - prev_col
+
+    temp_row = -1
+    temp_col = -1
+    out_rows = []
+
+    # write output rows until rel_row and rel_col are done
+    while rel_row != 0 or rel_col != 0:
+        row_diff = -np.sign(rel_row)
+        col_diff = -np.sign(rel_col)
+
+        action = -1
+        if rel_row > 0 and rel_col > 0:
+            action = 2
+        elif rel_row > 0 and rel_col == 0:
+            action = 3
+        elif rel_row > 0 and rel_col < 0:
+            action = 4
+        elif rel_row == 0 and rel_col > 0:
+            action = 1
+        elif rel_row == 0 and rel_col < 0:
+            action = 5
+        elif rel_row < 0 and rel_col > 0:
+            action = 8
+        elif rel_row < 0 and rel_col == 0:
+            action = 7
+        elif rel_row < 0 and rel_col < 0:
+            action = 6
+
+        rel_row += row_diff
+        rel_col += col_diff
+        temp_row = prev_row - row_diff
+        temp_col = prev_col - col_diff
+        temp_state = temp_row * num_cols + temp_col
+        prev_state = prev_row * num_cols + prev_col
+
+        out_rows.append([traj_num, prev_state, action, temp_state])
+        prev_row = temp_row
+        prev_col = temp_col
+
+    return out_rows
+
+
 
 # traverses the directory containing the decompressed AIS data to get the CSV names for further processing
 csv_files = []
@@ -125,6 +180,10 @@ csv_file_meta = []
 # min_lat and min_lon will keep track of the maximum and minimum longitudes in the dataset over all csvs
 min_lat = 90
 max_lat = -90
+# specify hard boundaries on latitude if desired
+if bound_lat:
+    min_lat = 35
+    max_lat = 42
 # these lists will keep track of minimum and maximum longitudes for all the zones seen
 # minimum of minimum longitudes and maximum of maximum longitudes will be used for final grid
 min_lon = 180
@@ -141,7 +200,7 @@ for csv_file in csv_files:
         reader = csv.reader(fh)
         header = next(reader)  # retrieves header of csv
         print('csv header: {}'.format(header))
-        #for i in range(MAX_ROWS):
+        # for i in range(MAX_ROWS):
         #    try:
         #        row = next(reader)  # get new row of the data
         #    except StopIteration:
@@ -153,12 +212,18 @@ for csv_file in csv_files:
             cur_sec = get_time(row[ind_time])
             if not (mmsi in trajectories):  # create new trajectory for unseen mmsi
                 trajectories[mmsi] = []
-            trajectories[mmsi].append([cur_lat, cur_lon, cur_sec])  # add state to mmsi's trajectory
+            if bound_lat:
+                # only adds to trajectory if the latitudes are within the hard boundary
+                if cur_lat <= max_lat and cur_lat >= min_lat:
+                    trajectories[mmsi].append([cur_lat, cur_lon, cur_sec])  # add state to mmsi's trajectory
+            else:
+                trajectories[mmsi].append([cur_lat, cur_lon, cur_sec])  # add state to mmsi's trajectory
+                # only infers latitude boundaries if hard boundaries aren't specified
+                if cur_lat > max_lat:
+                    max_lat = cur_lat
+                if cur_lat < min_lat:
+                    min_lat = cur_lat
             # finds minimum and maximum latitudes and longitudes in dataset for later grid sizing
-            if cur_lat > max_lat:
-                max_lat = cur_lat
-            elif cur_lat < min_lat:
-                min_lat = cur_lat
             if cur_lon > max_lon:
                 max_lon = cur_lon
             if cur_lon < min_lon:
@@ -178,7 +243,7 @@ num_cols = math.ceil((max_lon - min_lon)/grid_len)  # number of columns in the r
 print('number of columns in final grid: {}'.format(num_cols))
 
 # keeps track of time differences in seconds
-d_time = []
+# d_time = []
 
 # opens output csv file
 with open(out_dir + out_file, 'w') as output:
@@ -192,7 +257,7 @@ with open(out_dir + out_file, 'w') as output:
         # checks that trajectory contains more than one entry (otherwise is not trajectory)
         if len(trajectory) < MIN_STATES:
             continue
-        print('trajectory for {}: {} states'.format(mmsi, len(trajectory)))
+        # print('trajectory for {}: {} states'.format(mmsi, len(trajectory)))
         # sorts trajectory based on timestamp - looks like timestamps are out of order
         trajectory.sort(key=lambda x: x[2])
         cur_state = -1
@@ -208,18 +273,24 @@ with open(out_dir + out_file, 'w') as output:
             # the number of columns, and the grid unit length
             prev_state = cur_state
             cur_state = get_state(cur_lat, cur_lon, min_lat, min_lon, num_cols, grid_len)
-            if prev_state != -1:  # if there is a valid previous state, write a line of the csv
-                # infers action, implying that the system is deterministic
-                cur_action = get_action(prev_state, cur_state, num_cols)
-                # writes SAS line of csv if the action is nonzero
-                if cur_action != 0:
+            # only considers valid non-self transitions
+            if prev_state != -1 and prev_state != cur_state:
+                if not interp_actions:
+                    # infers action, implying that the system is deterministic
+                    cur_action = get_action(prev_state, cur_state, num_cols)
+                    # writes SAS line of csv if the action is nonzero
                     writer.writerow([i, prev_state, cur_action, cur_state])
                     # print('traj: {}, prev: {}, action: {}, cur: {}'.format(i, prev_state, cur_action, cur_state))
                     # logs time difference between states
-                    if prev_time != -1:
-                        d_time.append(cur_time - prev_time)
-                        if not has_action:  # the trajectory has at least one transition, so become true
-                            has_action = True
+                    # if prev_time != -1:
+                    #     d_time.append(cur_time - prev_time)
+                else:
+                    # linearly interpolates actions based on state to state transitions
+                    inferred_trajectory = get_interpolated_actions(i, prev_state, cur_state, num_cols)
+                    for sas in inferred_trajectory:
+                        writer.writerow(sas)
+                if not has_action:  # the trajectory has at least one transition, so become true
+                    has_action = True
         if has_action:
             i += 1  # increment i for each trajectory that has at least 1 non-self transition
 
