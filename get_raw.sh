@@ -13,10 +13,10 @@ CLEAR_BEFORE_DOWNLOAD=true
 # changes to specified output directory before downloading the data
 OUTPUT_DIR="./"
 OUTPUT_FILE="AIS_raw_data"
-if [ ! -d "${OUTPUT_DIR}" ]; then
-    mkdir -p "${OUTPUT_DIR}"
+if [[ ! -d "$OUTPUT_DIR" ]]; then
+    mkdir -p "$OUTPUT_DIR"
 fi
-cd $OUTPUT_DIR
+cd "$OUTPUT_DIR"
 
 
 SITE="https://coast.noaa.gov/htdata/CMSP/AISDataHandler/"
@@ -29,7 +29,8 @@ YEAR_END=2017
 # do not prefix single digit months with zero - the script takes care of that
 MONTH_BEGIN=1
 MONTH_END=1
-# the zones are Universal Transverse Mercator (UTM) zones, defined longitudinally
+# the zones are Universal Transverse Mercator (UTM) zones, defined longitudinally in 6 degree increments
+# with zone 1 being 180 W - 174 W
 # zone description: 1 - 9 -> Alaska, 4 - 5 -> Hawaii, 9 - 20 -> continental US
 # zones ascending zones correspond to west to east longitude. see originating site for more information
 # data available for zones 1 - 20
@@ -37,20 +38,20 @@ MONTH_END=1
 ZONE_BEGIN=18
 ZONE_END=18
 
-# define function for retrieving an individual year, month, zone tuple's filename
+# Retrieves an individual year, month, zone tuple's filename
 get_file () {
     year="$1"
     month="$2"
     zone="$3"
     local file=''
-    if [ ${month} -gt 9 ]; then # drop 0 if month > 9
-        if [ ${zone} -gt 9 ]; then # drop 0 if zone > 9
+    if [[ ${month} -gt 9 ]]; then # drop 0 if month > 9
+        if [[ ${zone} -gt 9 ]]; then # drop 0 if zone > 9
             file="${year}/AIS_${year}_${month}_Zone${zone}.zip"
         else # add 0 if zone <= 9
             file="${year}/AIS_${year}_${month}_Zone0${zone}.zip"
         fi
     else # add 0 if month <= 9
-        if [ ${zone} -gt 9 ]; then # drop 0 if zone > 9
+        if [[ ${zone} -gt 9 ]]; then # drop 0 if zone > 9
             file="${year}/AIS_${year}_0${month}_Zone${zone}.zip"
         else # add 0 if zone <= 9
             file="${year}/AIS_${year}_0${month}_Zone0${zone}.zip"
@@ -59,12 +60,13 @@ get_file () {
     echo "$file"
 }
 
-if [ "$CLEAR_BEFORE_DOWNLOAD" = true ]; then
+# removes existing data on machine if CLEAR_BEFORE_DOWNLOAD is set to true
+if [[ "$CLEAR_BEFORE_DOWNLOAD" = true ]]; then
     echo "removing all AIS data on machine before download"
     rm -rf "$OUTPUT_FILE"
 fi
 
-# parse command line arguments
+# if all 3 command line arguments are not empty, then get the data for the specified year, month, and zone
 if [[ ! -z "$1" && ! -z "$2" && ! -z "$3" ]]; then # command line argument used: $1 is year, $2 is month, and $3 is zone
     echo "getting AIS data for ${2}/${1}, zone ${3}"
     file=$(get_file "$1" "$2" "$3")
@@ -73,11 +75,11 @@ else
     if [[ -z "$1"  && -z "$2" && -z "$3" ]]; then # command line argument is empty: use ranges defined above
         # iterate through cartesian product of selected years, months, and zones
         echo "getting AIS data for years ${YEAR_BEGIN}-${YEAR_END}, months ${MONTH_BEGIN}-${MONTH_END}, and zones ${ZONE_BEGIN}-${ZONE_END}"
-        for year in $(seq $YEAR_BEGIN $YEAR_END); do # iterates through selected years
-            for month in $(seq $MONTH_BEGIN $MONTH_END); do # iterates through selected months
-                for zone in $(seq $ZONE_BEGIN $ZONE_END); do # iterates through selected zones
+        for year in $(seq "$YEAR_BEGIN" "$YEAR_END"); do # iterates through selected years
+            for month in $(seq "$MONTH_BEGIN" "$MONTH_END"); do # iterates through selected months
+                for zone in $(seq "$ZONE_BEGIN" "$ZONE_END"); do # iterates through selected zones
                     file=$(get_file "$year" "$month" "$zone")
-                    wget "$SITE$file"
+                    wget "${SITE}${file}"
                 done
             done
         done
@@ -86,9 +88,11 @@ else
         echo "usage option 2: './get_raw.sh' and set year, month, and zone ranges in the file"
     fi
 fi
+
+# unzip the collected files and then delete the .zip files remaining
 for zipped in *.zip; do
-    unzip $zipped -d ./
-    if [ "$DELETE_ZIPPED" = true ]; then
+    unzip "$zipped" -d ./
+    if [[ "$DELETE_ZIPPED" = true ]]; then
         rm "$zipped"
     fi
 done
