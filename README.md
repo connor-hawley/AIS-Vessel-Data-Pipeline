@@ -29,14 +29,14 @@ If the above command runs successfully, you should be ready to run the programs 
 # Workflow
 - ``get_raw.sh`` - run this file first to download and unzip the dataset. A command line argument may be used to specify the year, month, and zone, or without a command line argument, all files within the year, month, and zone ranges will be downloaded, according to the boundaries specified in the file. Read the top of the file for more details on what each parameter does.
 - ``process_ais_data.py`` - once ``get_raw.sh`` has finished downloading and unzipping the desired files, ``process_ais_data.py`` processes all the desired csv files to condense them into a final sequence file that can be used as an input to algorithms. ``process_ais_data.py`` has flexibility in how it pre-processes the data, which is described in ``config.yaml``. The coordinate grid can be bounded, certain time and zone ranges can be specified, and more. See ``config.yaml`` and ``process_ais_data.py`` for more details on what all the options and functionality are.
-- ``AIS_demo_data.ipynb`` - once ``get_raw.sh`` and ``process_ais_data.py`` have been run as desired, this Jupyter Notebook uses pandas and plotly to map trajectories on an interactive map to demonstrate how the pipeline has processed the data.
+- ``AIS_demo_data.ipynb`` - once ``get_raw.sh`` and ``process_ais_data.py`` have been run as desired, this Jupyter Notebook uses pandas and plotly to map trajectories on an interactive map to demonstrate how the pipeline has processed the data. If you are unfamiliar with Jupyter notebooks, run ``jupyter notebook`` and select this file to run it interactively.
 
 ## Dataset csv file columns detail
 The csv files obtained have the following data available:
-- MMSI - Maritime Mobile Service Identity value (integer as text)
-- BaseDateTime - Full UTC date and time (YYYY-MM-DDTHH:MM:SS)
-- LAT - Latitude (decimal degrees as double)
-- LON - Longitude (decimal degrees as double)
+- **MMSI** - Maritime Mobile Service Identity value (integer as text)
+- **BaseDateTime** - Full UTC date and time (YYYY-MM-DDTHH:MM:SS)
+- **LAT** - Latitude (decimal degrees as double)
+- **LON** - Longitude (decimal degrees as double)
 - SOG - Speed Over Ground (knots as float)
 - COG - Course Over Ground (degrees as float)
 - Heading - True heading angle (degrees as float)
@@ -50,6 +50,8 @@ The csv files obtained have the following data available:
 - Draft - Draft depth of vessel (see NAIS specification and codes) (meters as float)
 - Cargo - Cargo type (SEE NAIS specification and codes) (text)
 - TransceiverClass - Class of AIS transceiver (text) (unavailable in 2017 dataset)
+
+This preprocessing program only makes use of the bolded columns above. MMSI maps to ``sequence_id``, and (LAT, LON) tuples map to ``state_id``s. ``action_id`` is inferred by looking at sequential ``state_id``s when data are sorted by BaseDateTime.
 
 ## Output csv file columns detail
 - ``sequence_id`` - the unique identifier of the ship, represented as integers ascending from 0, an alias for MMSI

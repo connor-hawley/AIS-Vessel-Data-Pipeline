@@ -10,6 +10,7 @@ pandas = "*"
 numpy = "*"
 pyyaml = "*"
 datetime = "*"
+jupyter = "*"
 
 [requires]
 python_version = "3.7"
