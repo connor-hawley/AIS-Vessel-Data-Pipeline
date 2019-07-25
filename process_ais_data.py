@@ -101,8 +101,8 @@ def collect_csv_files(options, directories, meta_params):
                 # only considers valid years and months if time is bounded and valid zones if zones are bounded
                 if (not options['bound_time'] or (meta_params['min_year'] <= year <= meta_params['max_year'])) and \
                    (not options['bound_zone'] or (meta_params['min_zone'] <= zone <= meta_params['max_zone'])):
-                    if (not options['bound_time'] or (year == meta_params['min_year'] and month >= meta_params['min_month'])) and \
-                       (not options['bound_time'] or (year == meta_params['max_year'] and month <= meta_params['min_month'])):
+                    if (not options['bound_time'] or (not year == meta_params['min_year'] or month >= meta_params['min_month'])) and \
+                       (not options['bound_time'] or (not year == meta_params['max_year'] or month <= meta_params['max_month'])):
                         # csv_files will contain file locations relative to current directory
                         csv_files.append(os.path.join(root, file))
                         # create dictionary to describe file characteristics
