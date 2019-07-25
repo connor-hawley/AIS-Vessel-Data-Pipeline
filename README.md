@@ -9,19 +9,19 @@ This guide assumes that you have installed python 3.x on your machine, preferabl
 ## Option 1: Pipenv
 This repository is intended to be run using ``pipenv`` to manage package dependencies. 
 
-If you do not have ``pipenv`` installed, try calling 
+If you do not have ``pipenv`` installed, try calling <br/><br/>
 ``pip install pipenv``
 
-If you have ``pip`` installed, or install it using your OS package manager (details: https://github.com/pypa/pipenv). Once ``pipenv`` has been installed, run the following commands from the repository home directory, unless you have an environment that runs python 3.7 already, in which case just activate that environment and skip this command.
+If you have ``pip`` installed, or install it using your OS package manager (details: https://github.com/pypa/pipenv). Once ``pipenv`` has been installed, run the following commands from the repository home directory, unless you have an environment that runs python 3.7 already, in which case just activate that environment and skip this command. <br/><br/>
 ``pipenv --python 3.7``
 
-Once an environment running python 3.7 is available and pipenv is installed in that environment, just run this command to install all dependencies
+Once an environment running python 3.7 is available and pipenv is installed in that environment, just run this command to install all dependencies. <br/><br/>
 ``pipenv install``
 
 If the above command runs successfully, you should be ready to run the programs in the worflow.
 
 ## Option 2: Pip
-If you have pip installed and can easily run python 3, then installing required packages with requirements.txt should work okay.
+If you have pip installed and can easily run python 3, then installing required packages with requirements.txt should work okay. <br/><br/>
 ``pip install -r requirements.txt``
 
 If the above command runs successfully, you should be ready to run the programs in the worflow.
