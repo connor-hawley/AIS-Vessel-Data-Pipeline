@@ -7,28 +7,17 @@
 # specify whether or not to delete zipped files that are downloaded during execution
 DELETE_ZIPPED=true
 # specify whether or not to clear files already extracted before downloading new ones
-# TODO: make this smarter so that when CLEAR_BEFORE_DOWNLOAD is false it does not download files already on disk
-CLEAR_BEFORE_DOWNLOAD=true
-
-# changes to specified output directory before downloading the data
-OUTPUT_DIR="./"
-OUTPUT_FILE="AIS_raw_data"
-if [[ ! -d "$OUTPUT_DIR" ]]; then
-    mkdir -p "$OUTPUT_DIR"
-fi
-cd "$OUTPUT_DIR"
-
+CLEAR_BEFORE_DOWNLOAD=false
 
 SITE="https://coast.noaa.gov/htdata/CMSP/AISDataHandler/"
 # NOTE: all begin/end values are inclusive
 # data available in supported format for years 2015 - 2017
-# TODO: modify script to support data extraction from before 2015
 YEAR_BEGIN=2017
 YEAR_END=2017
 # data available for all months (1 - 12)
 # do not prefix single digit months with zero - the script takes care of that
 MONTH_BEGIN=1
-MONTH_END=1
+MONTH_END=12
 # the zones are Universal Transverse Mercator (UTM) zones, defined longitudinally in 6 degree increments
 # with zone 1 being 180 W - 174 W
 # zone description: 1 - 9 -> Alaska, 4 - 5 -> Hawaii, 9 - 20 -> continental US
@@ -60,6 +49,14 @@ get_file () {
     echo "$file"
 }
 
+# changes to specified output directory before downloading the data
+OUTPUT_DIR="./"
+OUTPUT_FILE="AIS_ASCII_BY_UTM_Month"
+if [[ ! -d "$OUTPUT_DIR" ]]; then
+    mkdir -p "$OUTPUT_DIR"
+fi
+cd "$OUTPUT_DIR"
+
 # removes existing data on machine if CLEAR_BEFORE_DOWNLOAD is set to true
 if [[ "$CLEAR_BEFORE_DOWNLOAD" = true ]]; then
     echo "removing all AIS data on machine before download"
@@ -74,12 +71,16 @@ if [[ ! -z "$1" && ! -z "$2" && ! -z "$3" ]]; then # command line argument used:
 else
     if [[ -z "$1"  && -z "$2" && -z "$3" ]]; then # command line argument is empty: use ranges defined above
         # iterate through cartesian product of selected years, months, and zones
-        echo "getting AIS data for years ${YEAR_BEGIN}-${YEAR_END}, months ${MONTH_BEGIN}-${MONTH_END}, and zones ${ZONE_BEGIN}-${ZONE_END}"
-        for year in $(seq "$YEAR_BEGIN" "$YEAR_END"); do # iterates through selected years
-            for month in $(seq "$MONTH_BEGIN" "$MONTH_END"); do # iterates through selected months
-                for zone in $(seq "$ZONE_BEGIN" "$ZONE_END"); do # iterates through selected zones
-                    file=$(get_file "$year" "$month" "$zone")
-                    wget "${SITE}${file}"
+        echo "getting AIS data for times ${MONTH_BEGIN}/${YEAR_BEGIN}-${MONTH_END}/${YEAR_END}, and zones ${ZONE_BEGIN}-${ZONE_END}"
+        for year in $(eval echo "{${YEAR_BEGIN}..${YEAR_END}}"); do # iterates through selected years
+            for month in {1..12}; do
+                for zone in $(eval echo "{${ZONE_BEGIN}..${ZONE_END}}"); do # iterates through selected zones
+                    # only gets files for months after MONTH_BEGIN on YEAR_BEGIN and vice versa for MONTH_END, YEAR_END
+                    if [[ ( ! ${year} -eq ${YEAR_BEGIN} || ${month} -ge ${MONTH_BEGIN} ) && \
+                       ( ! ${year} -eq ${YEAR_END} || ${month} -le ${MONTH_END} ) ]]; then
+                        file=$(get_file "$year" "$month" "$zone")
+                        wget "${SITE}${file}"
+                    fi
                 done
             done
         done
@@ -91,7 +92,7 @@ fi
 
 # unzip the collected files and then delete the .zip files remaining
 for zipped in *.zip; do
-    unzip "$zipped" -d ./
+    unzip -o "$zipped" -d ./
     if [[ "$DELETE_ZIPPED" = true ]]; then
         rm "$zipped"
     fi
