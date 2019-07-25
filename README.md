@@ -4,6 +4,28 @@ Preprocessing data based on https://marinecadastre.gov/ais/
 ## Description
 This repository is dedicated to downloading, extracting, and preprocessing the Coast Guard AIS dataset for use in machine learning algorithms. Data are available for all months of the years 2015 - 2017, and for UTM zones 1 - 20.
 
+# Getting Started
+This guide assumes that you have installed python 3.x on your machine, preferably python 3.7 and above.
+## Option 1: Pipenv
+This repository is intended to be run using ``pipenv`` to manage package dependencies. 
+
+If you do not have ``pipenv`` installed, try calling 
+``pip install pipenv``
+
+If you have ``pip`` installed, or install it using your OS package manager (details: https://github.com/pypa/pipenv). Once ``pipenv`` has been installed, run the following commands from the repository home directory, unless you have an environment that runs python 3.7 already, in which case just activate that environment and skip this command.
+``pipenv --python 3.7``
+
+Once an environment running python 3.7 is available and pipenv is installed in that environment, just run this command to install all dependencies
+``pipenv install``
+
+If the above command runs successfully, you should be ready to run the programs in the worflow.
+
+## Option 2: Pip
+If you have pip installed and can easily run python 3, then installing required packages with requirements.txt should work okay.
+``pip install -r requirements.txt``
+
+If the above command runs successfully, you should be ready to run the programs in the worflow.
+
 # Workflow
 - ``get_raw.sh`` - run this file first to download and unzip the dataset. A command line argument may be used to specify the year, month, and zone, or without a command line argument, all files within the year, month, and zone ranges will be downloaded, according to the boundaries specified in the file. Read the top of the file for more details on what each parameter does.
 - ``process_ais_data.py`` - once ``get_raw.sh`` has finished downloading and unzipping the desired files, ``process_ais_data.py`` processes all the desired csv files to condense them into a final sequence file that can be used as an input to algorithms. ``process_ais_data.py`` has flexibility in how it pre-processes the data, which is described in ``config.yaml``. The coordinate grid can be bounded, certain time and zone ranges can be specified, and more. See ``config.yaml`` and ``process_ais_data.py`` for more details on what all the options and functionality are.
@@ -34,12 +56,3 @@ The csv files obtained have the following data available:
 - ``from_state_id`` - the coordinate grid square the ship started in for a given transition, represented as an integer
 - ``action_id`` - the direction and length a ship went to transition between states, represented as an integer. See ``process_ais_data.py`` for more detail
 - ``to_state_id`` - the coordinate grid square the ship ended in for a given transition, represented as an integer
-
-# Converting from Git to IRL
-- if the source files from this repository have been moved to the irl repository, then the following changes must be made to each of the source files to change where they source their input and put their output
-## ``get_raw.sh``
-- set ``OUTPUT_DIR="../../data/AIS_data/"``
-## ``config.yaml``
-- set ``in_dir_path : ../../data/AIS_data/``
-- set ``out_dir_path : ../../data/AIS_data/AIS_sequence_data/``
-### before running any of these files, make sure that the directories these point to exist
