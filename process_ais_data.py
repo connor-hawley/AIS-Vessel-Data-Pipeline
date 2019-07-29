@@ -11,6 +11,7 @@ import csv
 import math
 import datetime
 import numpy as np
+import pandas as pd
 
 
 def main():
@@ -27,7 +28,7 @@ def main():
     # file containing important options, directories, parameters, etc.
     config_file = 'config.yaml'
 
-    # file to access final grid_params and the csv files' respective years, months, and zones
+    # file to write final grid_params and the csv files' respective years, months, and zones
     meta_file = 'meta_data.yaml'
 
     # gets the config dictionary and unpacks it
@@ -140,41 +141,64 @@ def read_data(csv_files, options, csv_indices, grid_params):
         grid_params['min_lat'] = 90
         grid_params['max_lat'] = -90
 
-    # initialize dictionary that will be filled with all trajectories
-    trajectories = {}
+    # holds all ais data, one dataframe per csv file
+    ais_data = []
+
+    # get data from all csv files
     for csv_file in csv_files:
-        with open(csv_file, 'r') as fh:  # boilerplate to read in csv file
-            reader = csv.reader(fh)
-            next(reader)  # discards header of csv
-            for i, row in enumerate(reader):
-                # only reads first MAX_ROWS if limit_rows is true
-                if options['limit_rows'] and i >= options['MAX_ROWS']:
-                    break
+        # we're gonna do the same, but with pandas
+        nrows = options['MAX_ROWS'] if options['limit_rows'] else None
+        usecols = ['MMSI', 'BaseDateTime', 'LAT', 'LON']
+        ais_df = pd.read_csv(csv_file, usecols=usecols, nrows=nrows)
+        ais_df['TIME'] = ais_df['BaseDateTime'].apply(get_time)
+        ais_df.drop(columns='BaseDateTime', inplace=True)
+        # drops rows not in range of specified boundaries if option is specified
+        if options['bound_lon']:
+            drop_rows = ais_df[(ais_df['LON'] < grid_params['min_lon']) | (ais_df['LON'] > grid_params['max_lon'])]
+            ais_df.drop(drop_rows.index, inplace=True)
+        if options['bound_lat']:
+            drop_rows = ais_df[(ais_df['LAT'] < grid_params['min_lat']) | (ais_df['LAT'] > grid_params['max_lat'])]
+            ais_df.drop(drop_rows.index, inplace=True)
 
-                # gets current id, time, longitude, and latitude of column
-                mmsi = row[csv_indices['mmsi']]
-                cur_sec = get_time(row[csv_indices['time']])
-                cur_lon = float(row[csv_indices['lon']])
-                cur_lat = float(row[csv_indices['lat']])
+        # finds minimum and maximum latitudes and longitudes in dataset for later grid sizing
+        if not options['bound_lon'] and ais_df['LON'].min() < grid_params['min_lon']:
+            grid_params['min_lon'] = ais_df['LON'].min()
+        if not options['bound_lon'] and ais_df['LON'].max() > grid_params['max_lon']:
+            grid_params['max_lon'] = ais_df['LON'].max()
+        if not options['bound_lat'] and ais_df['LAT'].min() < grid_params['min_lat']:
+            grid_params['min_lat'] = ais_df['LAT'].min()
+        if not options['bound_lat'] and ais_df['LAT'].max() > grid_params['max_lat']:
+            grid_params['max_lat'] = ais_df['LAT'].max()
 
-                # create new trajectory for unseen mmsi
-                if not (mmsi in trajectories):
-                    trajectories[mmsi] = []
+        # appends current dataframe to list of all dataframes
+        ais_data.append(ais_df)
 
-                # only adds to trajectory if (bound_lat => in lat bounds) and (bound_lon => in lon bounds)
-                if (not options['bound_lon'] or (grid_params['min_lon'] <= cur_lon <= grid_params['max_lon'])) and \
-                        (not options['bound_lat'] or (grid_params['min_lat']) <= cur_lat <= grid_params['max_lat']):
-                    trajectories[mmsi].append([cur_lon, cur_lat, cur_sec])
+        # with open(csv_file, 'r') as fh:  # boilerplate to read in csv file
+        #     reader = csv.reader(fh)
+        #     next(reader)  # discards header of csv
+        #     for i, row in enumerate(reader):
+        #         # only reads first MAX_ROWS if limit_rows is true
+        #         if options['limit_rows'] and i >= options['MAX_ROWS']:
+        #             break
+        #
+        #         # gets current id, time, longitude, and latitude of column
+        #         mmsi = row[csv_indices['mmsi']]
+        #         cur_sec = get_time(row[csv_indices['time']])
+        #         cur_lon = float(row[csv_indices['lon']])
+        #         cur_lat = float(row[csv_indices['lat']])
+        #
+        #         # create new trajectory for unseen mmsi
+        #         if not (mmsi in trajectories):
+        #             trajectories[mmsi] = []
+        #
+        #         # only adds to trajectory if (bound_lat => in lat bounds) and (bound_lon => in lon bounds)
+        #         if (not options['bound_lon'] or (grid_params['min_lon'] <= cur_lon <= grid_params['max_lon'])) and \
+        #                 (not options['bound_lat'] or (grid_params['min_lat']) <= cur_lat <= grid_params['max_lat']):
+        #             trajectories[mmsi].append([cur_lon, cur_lat, cur_sec])
+        #
+        #
 
-                # finds minimum and maximum latitudes and longitudes in dataset for later grid sizing
-                if not options['bound_lon'] and cur_lon < grid_params['min_lon']:
-                    grid_params['min_lon'] = cur_lon
-                if not options['bound_lon'] and cur_lon > grid_params['max_lon']:
-                    grid_params['max_lon'] = cur_lon
-                if not options['bound_lat'] and cur_lat < grid_params['min_lat']:
-                    grid_params['min_lat'] = cur_lat
-                if not options['bound_lat'] and cur_lat > grid_params['max_lat']:
-                    grid_params['max_lat'] = cur_lat
+    trajectories = pd.concat(ais_data, axis=0, ignore_index=True)
 
     # changes grid boundaries to provide some padding to each boundary, rounded to nearest degree
     if not options['bound_lon']:

@@ -12,12 +12,12 @@ CLEAR_BEFORE_DOWNLOAD=false
 SITE="https://coast.noaa.gov/htdata/CMSP/AISDataHandler/"
 # NOTE: all begin/end values are inclusive
 # data available in supported format for years 2015 - 2017
-YEAR_BEGIN=2017
+YEAR_BEGIN=2015
 YEAR_END=2017
 # data available for all months (1 - 12)
 # do not prefix single digit months with zero - the script takes care of that
-MONTH_BEGIN=1
-MONTH_END=12
+MONTH_BEGIN=3
+MONTH_END=9
 # the zones are Universal Transverse Mercator (UTM) zones, defined longitudinally in 6 degree increments
 # with zone 1 being 180 W - 174 W
 # zone description: 1 - 9 -> Alaska, 4 - 5 -> Hawaii, 9 - 20 -> continental US
@@ -79,7 +79,8 @@ else
                     if [[ ( ! ${year} -eq ${YEAR_BEGIN} || ${month} -ge ${MONTH_BEGIN} ) && \
                        ( ! ${year} -eq ${YEAR_END} || ${month} -le ${MONTH_END} ) ]]; then
                         file=$(get_file "$year" "$month" "$zone")
-                        wget "${SITE}${file}"
+                        echo $file
+                        #wget "${SITE}${file}"
                     fi
                 done
             done

@@ -41,5 +41,5 @@ grid_params:
     min_lat   : 35.0
     max_lat   : 42.0
     num_cols  : 0
-    grid_len  : 1.0
+    grid_len  : 1.0 # TODO: document purpose
 
