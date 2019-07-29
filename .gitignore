@@ -10,3 +10,5 @@ __pycache__/
 .idea
 
 .ipynb_checkpoints
+
+meta_data.yaml
