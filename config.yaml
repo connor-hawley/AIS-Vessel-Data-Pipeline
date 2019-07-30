@@ -6,8 +6,8 @@ options:
     bound_zone     : True     # specifies whether to bound the zones being read
     interp_actions : True     # specifies whether to interpolate actions if state transitions are not adjacent, otherwise actions can be arbitrarily large
     allow_diag     : False    # when interp_actions is true, specifies whether to allow for diagonal grid actions or not
-    MAX_ROWS       : 10000  # set number of rows to read of each CSV file since reading > 3 GB is going to take forever
-    MIN_STATES     : 2        # set minimum number of states in a trajectory necessary to qualify it for the output file
+    MAX_ROWS       : 100000    # set number of rows to read of each CSV file since reading > 3 GB is going to take forever
+    MIN_STATES     : 2       # set minimum number of states in a trajectory necessary to qualify it for the output file
 
 directories:
     in_dir_path  : ./  # specifies the directory where input data is located

@@ -148,10 +148,13 @@ def read_data(csv_files, options, csv_indices, grid_params):
     for csv_file in csv_files:
         # we're gonna do the same, but with pandas
         nrows = options['MAX_ROWS'] if options['limit_rows'] else None
-        usecols = ['MMSI', 'BaseDateTime', 'LAT', 'LON']
+        usecols = ['MMSI', 'LON', 'LAT', 'BaseDateTime']
         ais_df = pd.read_csv(csv_file, usecols=usecols, nrows=nrows)
+        ais_df = ais_df[usecols]
+
         ais_df['TIME'] = ais_df['BaseDateTime'].apply(get_time)
         ais_df.drop(columns='BaseDateTime', inplace=True)
+
         # drops rows not in range of specified boundaries if option is specified
         if options['bound_lon']:
             drop_rows = ais_df[(ais_df['LON'] < grid_params['min_lon']) | (ais_df['LON'] > grid_params['max_lon'])]
@@ -232,44 +235,71 @@ def write_data(trajectories, options, directories, grid_params):
             write output data, and what those files should be named.
         grid_params: Specifies the minimum and maximum latitudes and longitudes in the dataset.
     """
-    # opens output csv file
-    with open(directories['out_dir_path'] + directories['out_dir_file'], 'w') as output:
-        writer = csv.writer(output)
-        # writes header row
-        writer.writerow(['sequence_id', 'from_state_id', 'action_id', 'to_state_id'])
-        # counter for trajectories
-        i = 0
-        # discretize each trajectory now that boundaries of grid are known
-        for mmsi, trajectory in trajectories.items():
-            # checks that trajectory contains more than one entry (otherwise is not trajectory)
-            if len(trajectory) < options['MIN_STATES']:
-                continue
 
-            # sorts trajectory based on timestamp - looks like timestamps are out of order
-            trajectory.sort(key=lambda x: x[2])
-            cur_state = -1
-            cur_time = -1
-            has_action = False  # will become true if there is at least one transition with non-zero action
+    trajectories.sort_values(['MMSI', 'TIME'], inplace=True)
+    trajectories.drop(columns='TIME', inplace=True)
+    trajectories.reset_index(drop=True, inplace=True)
 
-            for coords in trajectory:
-                # gets discretized state based on current coordinates, the bottom left bound of the grid,
-                # the number of columns, and the grid unit length
-                cur_lon = coords[0]
-                cur_lat = coords[1]
-                prev_time = cur_time
-                cur_time = coords[2]
-                prev_state = cur_state
-                cur_state = get_state(cur_lon, cur_lat, grid_params)
+    trajectories['STATE'] = trajectories.apply(lambda x: get_state(x['LON'], x['LAT'], grid_params), axis=1)
 
-                # only considers valid non-self transitions
-                if prev_state != -1 and prev_state != cur_state:
-                    quads = get_action(i, prev_state, cur_state, grid_params['num_cols'], options)
-                    for isas in quads:
-                        writer.writerow(isas)
-                    if not has_action:  # the trajectory has at least one transition, so become true
-                        has_action = True
-            if has_action:
-                i += 1  # increment i for each trajectory that has at least 1 non-self transition
+    non_self_transitions = trajectories['STATE'].groupby(trajectories['MMSI']).diff().ne(0)
+    trajectories = trajectories.loc[non_self_transitions]
+
+    traj_lengths = trajectories['MMSI'].value_counts()
+    traj_keep = traj_lengths[traj_lengths > options['MIN_STATES'] - 1].index.values
+    trajectories = trajectories.loc[trajectories['MMSI'].isin(traj_keep)]
+
+    alias = {mmsi: ind for ind, mmsi in enumerate(trajectories['MMSI'].unique())}
+    trajectories.replace({"MMSI": alias}, inplace=True)
+
+    action_func = lambda x: get_action(x['MMSI'][1:], x['STATE'][:-1], x['STATE'][1:], grid_params['num_cols'], options)
+    sas_out = trajectories.groupby('MMSI').apply(action_func)
+    if isinstance(sas_out, pd.DataFrame):  # becomes a DataFrame when every trajectory has only one sas triplet
+        sas_out = sas_out[0]
+
+    sas = pd.concat(sas_out.tolist())
+    sas.reset_index(drop=True, inplace=True)
+
+    sas.to_csv(directories['out_dir_path'] + directories['out_dir_file'], index=False)
+
+    # # opens output csv file
+    # with open(directories['out_dir_path'] + directories['out_dir_file'], 'w') as output:
+    #     writer = csv.writer(output)
+    #     # writes header row
+    #     writer.writerow(['sequence_id', 'from_state_id', 'action_id', 'to_state_id'])
+    #     # counter for trajectories
+    #     i = 0
+    #     # discretize each trajectory now that boundaries of grid are known
+    #     for mmsi, trajectory in trajectories.items():
+    #         # checks that trajectory contains more than one entry (otherwise is not trajectory)
+    #         if len(trajectory) < options['MIN_STATES']:
+    #             continue
+    #
+    #         # sorts trajectory based on timestamp - looks like timestamps are out of order
+    #         trajectory.sort(key=lambda x: x[2])
+    #         cur_state = -1
+    #         cur_time = -1
+    #         has_action = False  # will become true if there is at least one transition with non-zero action
+    #
+    #         for coords in trajectory:
+    #             # gets discretized state based on current coordinates, the bottom left bound of the grid,
+    #             # the number of columns, and the grid unit length
+    #             cur_lon = coords[0]
+    #             cur_lat = coords[1]
+    #             prev_time = cur_time
+    #             cur_time = coords[2]
+    #             prev_state = cur_state
+    #             cur_state = get_state(cur_lon, cur_lat, grid_params)
+    #
+    #             # only considers valid non-self transitions
+    #             if prev_state != -1 and prev_state != cur_state:
+    #                 quads = get_action(i, prev_state, cur_state, grid_params['num_cols'], options)
+    #                 for isas in quads:
+    #                     writer.writerow(isas)
+    #                 if not has_action:  # the trajectory has at least one transition, so become true
+    #                     has_action = True
+    #         if has_action:
+    #             i += 1  # increment i for each trajectory that has at least 1 non-self transition
 
 
 def get_bounds(zone):
@@ -386,11 +416,27 @@ def get_action(traj_num, prev_state, cur_state, num_cols, options):
     Returns:
         A list of id-state-action-state transitions that interpolate between ``prev_state`` and ``cur_state``.
     """
+    data = {'ID': traj_num.reset_index(drop=True),
+            'PREV': prev_state.reset_index(drop=True),
+            'CUR': cur_state.reset_index(drop=True)}
+    traj_df = pd.DataFrame(data)
+
+    # return traj_df
     if not options['interp_actions']:
-        return get_action_arb(traj_num, prev_state, cur_state, num_cols)
-    if options['allow_diag']:
-        return get_action_interp_with_diag(traj_num, prev_state, cur_state, num_cols)
-    return get_action_interp_reg(traj_num, prev_state, cur_state, num_cols)
+        traj_df = traj_df.apply(lambda x: get_action_arb(x['ID'], x['PREV'], x['CUR'], num_cols), axis=1)
+        # return get_action_arb(traj_num, prev_state, cur_state, num_cols)
+    else:
+        if options['allow_diag']:
+            traj_df = traj_df.apply(lambda x: get_action_interp_with_diag(x['ID'], x['PREV'], x['CUR'], num_cols), axis=1)
+            # return get_action_interp_with_diag(traj_num, prev_state, cur_state, num_cols)
+        else:
+            traj_df = traj_df.apply(lambda x: get_action_interp_reg(x['ID'], x['PREV'], x['CUR'], num_cols), axis=1)
+            # return get_action_interp_reg(traj_num, prev_state, cur_state, num_cols)
+
+    last_state = pd.DataFrame({'ID': traj_num.iloc[0], 'PREV': cur_state.iloc[-1], 'ACT': -1, 'CUR': -1}, index=[0, ])
+    traj_df = pd.concat([traj_df, pd.Series(data={0: last_state})], ignore_index=True)
+    return traj_df
+
 
 
 def get_action_arb(traj_num, prev_state, cur_state, num_cols):
@@ -428,6 +474,11 @@ def get_action_arb(traj_num, prev_state, cur_state, num_cols):
     Returns:
         A list of id-state-action-state transitions that interpolate between ``prev_state`` and ``cur_state``.
     """
+    ids = []
+    prevs = []
+    acts = []
+    curs = []
+
     # gets row, column decomposition for previous and current states
     prev_row = prev_state // num_cols
     prev_col = prev_state % num_cols
@@ -458,8 +509,15 @@ def get_action_arb(traj_num, prev_state, cur_state, num_cols):
             y += 1
         action_num += 1
 
+    ids.append(traj_num)
+    prevs.append(prev_state)
+    acts.append(action_num)
+    curs.append(cur_state)
+
     # return output as one id-state-action-state list within another list for compatibility with other methods
-    return [[traj_num, prev_state, action_num, cur_state], ]
+    # return [[traj_num, prev_state, action_num, cur_state], ]
+    out_df = pd.DataFrame({'ID': ids, 'PREV': prevs, 'ACT': acts, 'CUR': curs})
+    return out_df
 
 
 def get_action_interp_with_diag(traj_num, prev_state, cur_state, num_cols):
@@ -512,6 +570,11 @@ def get_action_interp_with_diag(traj_num, prev_state, cur_state, num_cols):
         Returns:
             A list of id-state-action-state transitions that interpolate between ``prev_state`` and ``cur_state``.
     """
+    ids = []
+    prevs = []
+    acts = []
+    curs = []
+
     # gets row, column decomposition for previous and current states
     prev_row = prev_state // num_cols
     prev_col = prev_state % num_cols
@@ -522,7 +585,7 @@ def get_action_interp_with_diag(traj_num, prev_state, cur_state, num_cols):
     rel_col = cur_col - prev_col
 
     # write output rows until rel_row and rel_col are both zero
-    out_rows = []
+    # out_rows = []
     while not(rel_row == 0 and rel_col == 0):
         # selects action to minimize rel_row and rel_col
         action = -1
@@ -556,11 +619,18 @@ def get_action_interp_with_diag(traj_num, prev_state, cur_state, num_cols):
         prev_state = prev_row * num_cols + prev_col
 
         # adds another state-action-state interpolation to the trajectory
-        out_rows.append([traj_num, prev_state, action, temp_state])
+        # out_rows.append([traj_num, prev_state, action, temp_state])
+        ids.append(traj_num)
+        prevs.append(prev_state)
+        acts.append(action)
+        curs.append(cur_state)
+
         prev_row = temp_row
         prev_col = temp_col
 
-    return out_rows
+    # return out_rows
+    out_df = pd.DataFrame({'ID': ids, 'PREV': prevs, 'ACT': acts, 'CUR': curs})
+    return out_df
 
 
 def get_action_interp_reg(traj_num, prev_state, cur_state, num_cols):
@@ -613,6 +683,11 @@ def get_action_interp_reg(traj_num, prev_state, cur_state, num_cols):
         Returns:
             A list of id-state-action-state transitions that interpolate between ``prev_state`` and ``cur_state``.
     """
+    ids = []
+    prevs = []
+    acts = []
+    curs = []
+
     # gets row, column decomposition for previous and current states
     prev_row = prev_state // num_cols
     prev_col = prev_state % num_cols
@@ -623,7 +698,7 @@ def get_action_interp_reg(traj_num, prev_state, cur_state, num_cols):
     rel_col = cur_col - prev_col
 
     # write output rows until rel_row and rel_col are both zero
-    out_rows = []
+    # out_rows = []
     while not(rel_row == 0 and rel_col == 0):
         # selects action to reduce the largest of rel_row and rel_col
         action = -1
@@ -657,11 +732,19 @@ def get_action_interp_reg(traj_num, prev_state, cur_state, num_cols):
         prev_state = prev_row * num_cols + prev_col
 
         # adds another state-action-state interpolation to the trajectory
-        out_rows.append([traj_num, prev_state, action, temp_state])
+        # out_rows.append([traj_num, prev_state, action, temp_state])
+
+        ids.append(traj_num)
+        prevs.append(prev_state)
+        acts.append(action)
+        curs.append(temp_state)
+
         prev_row = temp_row
         prev_col = temp_col
 
-    return out_rows
+    # return out_rows
+    out_df = pd.DataFrame({'ID': ids, 'PREV': prevs, 'ACT': acts, 'CUR': curs})
+    return out_df
 
 
 if __name__ == '__main__':
