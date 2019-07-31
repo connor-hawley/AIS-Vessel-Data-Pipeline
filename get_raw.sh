@@ -49,8 +49,18 @@ get_file () {
     echo "$file"
 }
 
+# sets output directory to specified value or loads it from command line argument
+OUTPUT_DIR=""
+if [[ (! -z "$1" && ! -z "$2" && ! -z "$3" && ! -z "$4") || \
+   ( ! -z "$1" && -z "$2" ) ]]; then
+   OUTPUT_DIR="$1"
+else
+    OUTPUT_DIR="./"
+fi
+
+echo "$OUTPUT_DIR"
+
 # changes to specified output directory before downloading the data
-OUTPUT_DIR="./"
 OUTPUT_FILE="AIS_ASCII_BY_UTM_Month"
 if [[ ! -d "$OUTPUT_DIR" ]]; then
     mkdir -p "$OUTPUT_DIR"
@@ -64,13 +74,17 @@ if [[ "$CLEAR_BEFORE_DOWNLOAD" = true ]]; then
 fi
 
 # if all 3 command line arguments are not empty, then get the data for the specified year, month, and zone
-if [[ ! -z "$1" && ! -z "$2" && ! -z "$3" ]]; then # command line argument used: $1 is year, $2 is month, and $3 is zone
+if [[ ! -z "$1" && ! -z "$2" && ! -z "$3" && ! -z "$4" ]]; then # command line argument used: $2 is year, $3 is month, and $4 is zone
+    echo "getting AIS data for ${3}/${2}, zone ${4}"
+    file=$(get_file "$2" "$3" "$4")
+    wget "${SITE}${file}"
+elif [[ ! -z "$1" && ! -z "$2" && ! -z "$3" ]]; then # command line argument used: $1 is year, $2 is month, and $3 is zone
     echo "getting AIS data for ${2}/${1}, zone ${3}"
     file=$(get_file "$1" "$2" "$3")
     wget "${SITE}${file}"
-else
-    if [[ -z "$1"  && -z "$2" && -z "$3" ]]; then # command line argument is empty: use ranges defined above
-        # iterate through cartesian product of selected years, months, and zones
+else # command line argument for year month zone is empty: use ranges defined above
+    if [[ -z "$2" ]]; then
+        # iterate through selected years, months, and zones
         echo "getting AIS data for times ${MONTH_BEGIN}/${YEAR_BEGIN}-${MONTH_END}/${YEAR_END}, and zones ${ZONE_BEGIN}-${ZONE_END}"
         for year in $(eval echo "{${YEAR_BEGIN}..${YEAR_END}}"); do # iterates through selected years
             for month in {1..12}; do
@@ -79,15 +93,17 @@ else
                     if [[ ( ! ${year} -eq ${YEAR_BEGIN} || ${month} -ge ${MONTH_BEGIN} ) && \
                        ( ! ${year} -eq ${YEAR_END} || ${month} -le ${MONTH_END} ) ]]; then
                         file=$(get_file "$year" "$month" "$zone")
-                        echo $file
-                        #wget "${SITE}${file}"
+                        wget "${SITE}${file}"
                     fi
                 done
             done
         done
     else # invalid command line argument
-        echo "usage option 1: './get_raw.sh year month zone' for one tuple of year, month, and zone"
-        echo "usage option 2: './get_raw.sh' and set year, month, and zone ranges in the file"
+        echo "usage option 1: './get_raw.sh path year month zone' for specified year, month, and zone to be downloaded to path"
+        echo "usage option 2: './get_raw.sh year month zone' for specified year, month, and zone. set path in file"
+        echo "usage option 3: './get_raw.sh path' for specified path. set year, month, and zone ranges in file"
+        echo "usage option 4: './get_raw.sh' set path, year, month, and zone ranges in file"
+
     fi
 fi
 
