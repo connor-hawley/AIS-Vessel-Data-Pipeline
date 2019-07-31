@@ -118,7 +118,7 @@ def read_data(csv_files, options, grid_params):
     Reads each csv in ``csv_files`` to obtain coordinates and timestamp series associated with each mmsi id encountered.
     Optionally, the boundaries of the grid later specified can be inferred by calculating the minimum and maximum
     longitudes and latitudes by setting ``options['bound_lon']`` and ``options['bound_lat']`` to False, respectively
-    in the ``config_file``. It can also be specified to only read the first ``options['MAX_ROWS']`` of each csv file by
+    in the ``config_file``. It can also be specified to only read the first ``options['max_rows']`` of each csv file by
     setting ``options['limit_rows']`` to True in the ``config_file``.
 
     Args:
@@ -146,7 +146,7 @@ def read_data(csv_files, options, grid_params):
     # get data from all csv files
     for csv_file in csv_files:
         # reads in the raw data with columns and number of rows specified in config.yaml
-        nrows = options['MAX_ROWS'] if options['limit_rows'] else None
+        nrows = options['max_rows'] if options['limit_rows'] else None
         usecols = ['MMSI', 'LON', 'LAT', 'BaseDateTime']
         ais_df = pd.read_csv(csv_file, usecols=usecols, nrows=nrows)
         ais_df = ais_df[usecols]
@@ -224,9 +224,9 @@ def write_data(trajectories, options, directories, grid_params):
     # rounds latitude and longitude to specified precision
     trajectories = trajectories.round({'LON': options['prec_coords'], 'LAT': options['prec_coords']})
 
-    # drops the trajectories with fewer states than ``options['MIN_STATES']``
+    # drops the trajectories with fewer states than ``options['min_states']``
     traj_lengths = trajectories['MMSI'].value_counts()
-    traj_keep = traj_lengths[traj_lengths > options['MIN_STATES'] - 1].index.values
+    traj_keep = traj_lengths[traj_lengths > options['min_states'] - 1].index.values
     trajectories = trajectories.loc[trajectories['MMSI'].isin(traj_keep)]
 
     # aliases the MMSI column to ascending integers to enumerate trajectories and make easier to read
