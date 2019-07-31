@@ -5,33 +5,27 @@ options:
     bound_time     : True     # specifies whether to bound the times considered
     bound_zone     : True     # specifies whether to bound the zones being read
     interp_actions : True     # specifies whether to interpolate actions if state transitions are not adjacent, otherwise actions can be arbitrarily large
+    append_coords  : True     # specifies whether to add raw latitude, longitude values as columns to the output csv
+    prec_coords    : 1        # the number of decimal places to round each coordinate to
     allow_diag     : False    # when interp_actions is true, specifies whether to allow for diagonal grid actions or not
-    MAX_ROWS       : 100000    # set number of rows to read of each CSV file since reading > 3 GB is going to take forever
-    MIN_STATES     : 2       # set minimum number of states in a trajectory necessary to qualify it for the output file
+    MAX_ROWS       : 100000  # set number of rows to read of each CSV file since reading > 3 GB is going to take forever
+    MIN_STATES     : 2        # set minimum number of states in a trajectory necessary to qualify it for the output file
 
 directories:
     in_dir_path  : ./  # specifies the directory where input data is located
     in_dir_data  : AIS_ASCII_by_UTM_Month/  # specifies the folder name containing all the data in the input directory
     out_dir_path : ./  # specified the directory where output data files should be written
     out_dir_file : ais_data_output.csv  # specifies output file name (should be .csv)
-    # out_meta    : ais_meta_output.csv  # specifies output file for grid metadata
-
-# ais csv file row indices for input data of interest
-csv_indices:
-    mmsi : 0
-    time : 1
-    lon  : 3
-    lat  : 2
 
 # specifies the metadata bounds (inclusive) for what data to consider
 # time bounds go from min_year/min_month - max_year/max_month, not just some month range of each valid year
 meta_params:
-    min_year  : 2017
+    min_year  : 2015
     min_month : 1
     max_year  : 2017
-    max_month : 1
-    min_zone  : 18
-    max_zone  : 18
+    max_month : 12
+    min_zone  : 15
+    max_zone  : 20
 
 # this will track the minimum and maximum latitudes and longitudes in the dataset if bound_lat and bound_lon are False
 # otherwise, grid_params specifies the grid boundaries in degrees.

@@ -7,7 +7,6 @@ with the discretized states, inferred actions, and records the resulting grid pa
 """
 import yaml
 import os
-import csv
 import math
 import datetime
 import numpy as np
@@ -35,7 +34,6 @@ def main():
     config = get_config(config_file)
     options = config['options']
     directories = config['directories']
-    csv_indices = config['csv_indices']
     meta_params = config['meta_params']
     grid_params = config['grid_params']
 
@@ -43,7 +41,7 @@ def main():
     csv_files, all_files_meta = collect_csv_files(options, directories, meta_params)
 
     # reads the collected csv files and assembles trajectories
-    trajectories, grid_params = read_data(csv_files, options, csv_indices, grid_params)
+    trajectories, grid_params = read_data(csv_files, options, grid_params)
 
     # processes (fits to grid) trajectories and writes generates sequences to output file
     write_data(trajectories, options, directories, grid_params)
@@ -82,7 +80,7 @@ def collect_csv_files(options, directories, meta_params):
     ``csv_files`` list for later reading of all valid csvs found and logging file metadata in ``all_files_meta``.
 
     Args:
-        options: the options specified by the user in ``config_file`` on how to run the script.
+        options: The options specified by the user in ``config_file`` on how to run the script.
         directories: The directories specified by the user in ``config_file`` on where to look for input data, where to
             write output data, and what those files should be named.
         meta_params: The parameters specified by the user in ``config_file`` to define time and zone range for the
@@ -106,13 +104,15 @@ def collect_csv_files(options, directories, meta_params):
                        (not options['bound_time'] or (not year == meta_params['max_year'] or month <= meta_params['max_month'])):
                         # csv_files will contain file locations relative to current directory
                         csv_files.append(os.path.join(root, file))
+
                         # create dictionary to describe file characteristics
                         file_meta = {'year': year, 'month': month, 'zone': zone}
                         all_files_meta[file] = file_meta
+
     return csv_files, all_files_meta
 
 
-def read_data(csv_files, options, csv_indices, grid_params):
+def read_data(csv_files, options, grid_params):
     """Iterate through each csv file to segregate each trajectory by its mmsi id.
 
     Reads each csv in ``csv_files`` to obtain coordinates and timestamp series associated with each mmsi id encountered.
@@ -124,12 +124,11 @@ def read_data(csv_files, options, csv_indices, grid_params):
     Args:
         csv_files: A list of paths to all valid csv files found.
         options: The options specified by the user in ``config_file`` on how to run the script.
-        csv_indices: AIS csv file row lookup indices for input data of interest.
         grid_params: Specifies the minimum and maximum latitudes and longitudes in the dataset. Will be updated to fit
             dataset if ``options['bound_lon']`` or ``options['bount_lat']`` is False in the ``config_file``.
 
     Returns:
-        trajectories: A dictionary mapping mmsi ids to lists of coordinate-timestamp triplets.
+        trajectories: A pandas DataFrame of all data entries with the format ``['MMSI', 'LON', 'LAT', 'TIME']``.
         grid_params: Specifies the minimum and maximum latitudes and longitudes in the dataset. Will be updated to fit
             dataset if ``options['bound_lon']`` or ``options['bount_lat']`` is False in the ``config_file``.
     """
@@ -146,24 +145,23 @@ def read_data(csv_files, options, csv_indices, grid_params):
 
     # get data from all csv files
     for csv_file in csv_files:
-        # we're gonna do the same, but with pandas
+        # reads in the raw data with columns and number of rows specified in config.yaml
         nrows = options['MAX_ROWS'] if options['limit_rows'] else None
         usecols = ['MMSI', 'LON', 'LAT', 'BaseDateTime']
         ais_df = pd.read_csv(csv_file, usecols=usecols, nrows=nrows)
         ais_df = ais_df[usecols]
 
+        # Interprets raw time entries as timestamps and drops original column
         ais_df['TIME'] = ais_df['BaseDateTime'].apply(get_time)
         ais_df.drop(columns='BaseDateTime', inplace=True)
 
-        # drops rows not in range of specified boundaries if option is specified
+        # keeps only rows in boundaries if specified
         if options['bound_lon']:
-            drop_rows = ais_df[(ais_df['LON'] < grid_params['min_lon']) | (ais_df['LON'] > grid_params['max_lon'])]
-            ais_df.drop(drop_rows.index, inplace=True)
+            ais_df = ais_df.loc[(ais_df['LON'] >= grid_params['min_lon']) & (ais_df['LON'] <= grid_params['max_lon'])]
         if options['bound_lat']:
-            drop_rows = ais_df[(ais_df['LAT'] < grid_params['min_lat']) | (ais_df['LAT'] > grid_params['max_lat'])]
-            ais_df.drop(drop_rows.index, inplace=True)
+            ais_df = ais_df.loc[(ais_df['LAT'] >= grid_params['min_lat']) & (ais_df['LAT'] <= grid_params['max_lat'])]
 
-        # finds minimum and maximum latitudes and longitudes in dataset for later grid sizing
+        # infers grid boundaries if no boundaries are specified
         if not options['bound_lon'] and ais_df['LON'].min() < grid_params['min_lon']:
             grid_params['min_lon'] = ais_df['LON'].min()
         if not options['bound_lon'] and ais_df['LON'].max() > grid_params['max_lon']:
@@ -176,34 +174,10 @@ def read_data(csv_files, options, csv_indices, grid_params):
         # appends current dataframe to list of all dataframes
         ais_data.append(ais_df)
 
-        # with open(csv_file, 'r') as fh:  # boilerplate to read in csv file
-        #     reader = csv.reader(fh)
-        #     next(reader)  # discards header of csv
-        #     for i, row in enumerate(reader):
-        #         # only reads first MAX_ROWS if limit_rows is true
-        #         if options['limit_rows'] and i >= options['MAX_ROWS']:
-        #             break
-        #
-        #         # gets current id, time, longitude, and latitude of column
-        #         mmsi = row[csv_indices['mmsi']]
-        #         cur_sec = get_time(row[csv_indices['time']])
-        #         cur_lon = float(row[csv_indices['lon']])
-        #         cur_lat = float(row[csv_indices['lat']])
-        #
-        #         # create new trajectory for unseen mmsi
-        #         if not (mmsi in trajectories):
-        #             trajectories[mmsi] = []
-        #
-        #         # only adds to trajectory if (bound_lat => in lat bounds) and (bound_lon => in lon bounds)
-        #         if (not options['bound_lon'] or (grid_params['min_lon'] <= cur_lon <= grid_params['max_lon'])) and \
-        #                 (not options['bound_lat'] or (grid_params['min_lat']) <= cur_lat <= grid_params['max_lat']):
-        #             trajectories[mmsi].append([cur_lon, cur_lat, cur_sec])
-        #
-        #
-
+    # merges dataframes from all csvs
     trajectories = pd.concat(ais_data, axis=0, ignore_index=True)
 
-    # changes grid boundaries to provide some padding to each boundary, rounded to nearest degree
+    # rounds inferred grid boundaries to nearest degree to provide some padding to each boundary
     if not options['bound_lon']:
         grid_params['min_lon'] = float(math.floor(grid_params['min_lon']))
         grid_params['max_lon'] = float(math.ceil(grid_params['max_lon']))
@@ -224,82 +198,55 @@ def write_data(trajectories, options, directories, grid_params):
     to the output csv specified by ``options['out_dir'] + options['out_file']``. Each trajectory is also sorted by
     its timestamp.
 
-    The trajectories have their ids aliased by ``i``, a counter variable that only increments whenever a trajectory is
+    The trajectories have their ids aliased by a counter variable that only increments whenever a trajectory is
     going to appear in the final csv. Self-transitions are discarded, and because of the huge grid size, most
     trajectories will be discarded since they will never transition between grid squares.
 
     Args:
-        trajectories: A dictionary mapping mmsi ids to lists of coordinate-timestamp triplets.
+        trajectories: A pandas DataFrame of all data entries with the format ``['MMSI', 'LON', 'LAT', 'TIME']``.
         options: The options specified by the user in ``config_file`` on how to run the script.
         directories: The directories specified by the user in ``config_file`` on where to look for input data, where to
             write output data, and what those files should be named.
         grid_params: Specifies the minimum and maximum latitudes and longitudes in the dataset.
     """
-
+    # sorts based on MMSI, then sorts by timestamps within MMSI groups, drops the time column
     trajectories.sort_values(['MMSI', 'TIME'], inplace=True)
     trajectories.drop(columns='TIME', inplace=True)
-    trajectories.reset_index(drop=True, inplace=True)
 
+    # creates a new column of discretized states based on coordinate pairs
     trajectories['STATE'] = trajectories.apply(lambda x: get_state(x['LON'], x['LAT'], grid_params), axis=1)
 
+    # looks at state differences within MMSI trajectories and only keeps the states with nonzero differences
+    # trajectories with only one state are kept because they will have a first row with 'nan' for diff
     non_self_transitions = trajectories['STATE'].groupby(trajectories['MMSI']).diff().ne(0)
     trajectories = trajectories.loc[non_self_transitions]
 
+    # rounds latitude and longitude to specified precision
+    trajectories = trajectories.round({'LON': options['prec_coords'], 'LAT': options['prec_coords']})
+
+    # drops the trajectories with fewer states than ``options['MIN_STATES']``
     traj_lengths = trajectories['MMSI'].value_counts()
     traj_keep = traj_lengths[traj_lengths > options['MIN_STATES'] - 1].index.values
     trajectories = trajectories.loc[trajectories['MMSI'].isin(traj_keep)]
 
+    # aliases the MMSI column to ascending integers to enumerate trajectories and make easier to read
     alias = {mmsi: ind for ind, mmsi in enumerate(trajectories['MMSI'].unique())}
     trajectories.replace({"MMSI": alias}, inplace=True)
 
-    action_func = lambda x: get_action(x['MMSI'][1:], x['STATE'][:-1], x['STATE'][1:], grid_params['num_cols'], options)
-    sas_out = trajectories.groupby('MMSI').apply(action_func)
-    if isinstance(sas_out, pd.DataFrame):  # becomes a DataFrame when every trajectory has only one sas triplet
-        sas_out = sas_out[0]
+    # resets index now that manipulation of this dataframe has finished
+    trajectories.reset_index(drop=True, inplace=True)
 
-    sas = pd.concat(sas_out.tolist())
+    # creates a series of stacked dataframes, each dataframe representing an interpolated state transition
+    sas = trajectories.groupby('MMSI').apply(lambda x: get_action(x, options, grid_params))
+    if isinstance(sas, pd.DataFrame):  # becomes a DataFrame when every trajectory has only one sas triplet
+        sas = sas[0]
+
+    # merges the series of stacked dataframes into one dataframe and resets the index
+    sas = pd.concat(sas.tolist())
     sas.reset_index(drop=True, inplace=True)
 
+    # writes new dataframe to final csv
     sas.to_csv(directories['out_dir_path'] + directories['out_dir_file'], index=False)
-
-    # # opens output csv file
-    # with open(directories['out_dir_path'] + directories['out_dir_file'], 'w') as output:
-    #     writer = csv.writer(output)
-    #     # writes header row
-    #     writer.writerow(['sequence_id', 'from_state_id', 'action_id', 'to_state_id'])
-    #     # counter for trajectories
-    #     i = 0
-    #     # discretize each trajectory now that boundaries of grid are known
-    #     for mmsi, trajectory in trajectories.items():
-    #         # checks that trajectory contains more than one entry (otherwise is not trajectory)
-    #         if len(trajectory) < options['MIN_STATES']:
-    #             continue
-    #
-    #         # sorts trajectory based on timestamp - looks like timestamps are out of order
-    #         trajectory.sort(key=lambda x: x[2])
-    #         cur_state = -1
-    #         cur_time = -1
-    #         has_action = False  # will become true if there is at least one transition with non-zero action
-    #
-    #         for coords in trajectory:
-    #             # gets discretized state based on current coordinates, the bottom left bound of the grid,
-    #             # the number of columns, and the grid unit length
-    #             cur_lon = coords[0]
-    #             cur_lat = coords[1]
-    #             prev_time = cur_time
-    #             cur_time = coords[2]
-    #             prev_state = cur_state
-    #             cur_state = get_state(cur_lon, cur_lat, grid_params)
-    #
-    #             # only considers valid non-self transitions
-    #             if prev_state != -1 and prev_state != cur_state:
-    #                 quads = get_action(i, prev_state, cur_state, grid_params['num_cols'], options)
-    #                 for isas in quads:
-    #                     writer.writerow(isas)
-    #                 if not has_action:  # the trajectory has at least one transition, so become true
-    #                     has_action = True
-    #         if has_action:
-    #             i += 1  # increment i for each trajectory that has at least 1 non-self transition
 
 
 def get_bounds(zone):
@@ -401,45 +348,62 @@ def get_state(cur_lon, cur_lat, grid_params):
     return int(row * grid_params['num_cols'] + col)
 
 
-def get_action(traj_num, prev_state, cur_state, num_cols, options):
+def get_action(traj, options, grid_params):
     """Wrapper function for other ``get_action`` functions.
 
-    Calls the correct ``get_action`` variant based on the options input and returns the resulting output.
+    Calls the correct ``get_action`` variant based on the options input and returns the resulting output with
+    interpolated actions for all entries in the series.
 
     Args:
-        traj_num: the trajectory id number represented as an integer.
-        prev_state: the state that preceded the current state represented as an integer.
-        cur_state: the state that the system is currently in represented as an integer.
-        num_cols: the number of columns in each row on the grid represented as an integer.
+        traj: A pandas DataFrame with all the states encountered in a trajectory with their respective coordinates.
         options: The options specified by the user in ``config_file`` on how to run the script.
+        grid_params: Specifies the minimum and maximum latitudes and longitudes in the dataset.
 
     Returns:
-        A list of id-state-action-state transitions that interpolate between ``prev_state`` and ``cur_state``.
+        A pandas Series of DataFrames with each DataFrame entry representing one interpolated state-action-state
+        triplet.
     """
-    data = {'ID': traj_num.reset_index(drop=True),
-            'PREV': prev_state.reset_index(drop=True),
-            'CUR': cur_state.reset_index(drop=True)}
+    # retrieves trajectory data
+    traj_num = traj.name
+    states = traj['STATE']
+    lon = traj['LON']
+    lat = traj['LAT']
+
+    # prepares a dictionary of state transitions to be fed row-by-row as a DataFrame to the interpolation functions
+    data = {
+        'ID': pd.Series([traj_num] * (len(states) - 1)),
+        'PREV': states.iloc[:-1].reset_index(drop=True),
+        'CUR': states.iloc[1:].reset_index(drop=True)
+    }
+
+    # if specified, appends the original entry coordinates (not discretized) for each 'PREV' entry
+    if options['append_coords']:
+        data['LON'] = lon[:-1].reset_index(drop=True)
+        data['LAT'] = lat[:-1].reset_index(drop=True)
+
+    # formats the final data dictionary as a DataFrame
     traj_df = pd.DataFrame(data)
 
-    # return traj_df
+    # selects specified interpolation function and applies it row-wise to ``traj_df``
     if not options['interp_actions']:
-        traj_df = traj_df.apply(lambda x: get_action_arb(x['ID'], x['PREV'], x['CUR'], num_cols), axis=1)
-        # return get_action_arb(traj_num, prev_state, cur_state, num_cols)
+        traj_df = traj_df.apply(lambda x: get_action_arb(x, options, grid_params), axis=1)
     else:
         if options['allow_diag']:
-            traj_df = traj_df.apply(lambda x: get_action_interp_with_diag(x['ID'], x['PREV'], x['CUR'], num_cols), axis=1)
-            # return get_action_interp_with_diag(traj_num, prev_state, cur_state, num_cols)
+            traj_df = traj_df.apply(lambda x: get_action_interp_with_diag(x, options, grid_params), axis=1)
         else:
-            traj_df = traj_df.apply(lambda x: get_action_interp_reg(x['ID'], x['PREV'], x['CUR'], num_cols), axis=1)
-            # return get_action_interp_reg(traj_num, prev_state, cur_state, num_cols)
+            traj_df = traj_df.apply(lambda x: get_action_interp_reg(x, options, grid_params), axis=1)
 
-    last_state = pd.DataFrame({'ID': traj_num.iloc[0], 'PREV': cur_state.iloc[-1], 'ACT': -1, 'CUR': -1}, index=[0, ])
-    traj_df = pd.concat([traj_df, pd.Series(data={0: last_state})], ignore_index=True)
+    # appends the final state to each trajectory as its own row to allow for easier plotting of trajectories
+    if options['append_coords']:
+        final_state = {'ID': traj_num, 'PREV': states.iloc[-1], 'ACT': -1, 'CUR': -1, 'LON': lon.iloc[-1],
+                       'LAT': lat.iloc[-1]}
+        last_row = pd.DataFrame(final_state, index=[0, ])
+        traj_df = pd.concat([traj_df, pd.Series(data={0: last_row})], ignore_index=True)
+
     return traj_df
 
 
-
-def get_action_arb(traj_num, prev_state, cur_state, num_cols):
+def get_action_arb(row, options, grid_params):
     """Calculates an arbitrary action from the previous state to current state relative to the previous state.
 
     First, the relative offset between the current and previous state in rows and columns is calculated.
@@ -466,18 +430,20 @@ def get_action_arb(traj_num, prev_state, cur_state, num_cols):
     Thus, this algorithm will return 9 as the action.
 
     Args:
-        traj_num: the trajectory id number represented as an integer.
-        prev_state: the state that preceded the current state represented as an integer.
-        cur_state: the state that the system is currently in represented as an integer.
-        num_cols: the number of columns in each row on the grid represented as an integer.
+        row: a pandas Series representing one row of the DataFrame the function is applied to, containing the trajectory
+            number, previous state, current state, longitude, and latitude.
+        options: The options specified by the user in ``config_file`` on how to run the script.
+        grid_params: Specifies the minimum and maximum latitudes and longitudes in the dataset.
 
     Returns:
-        A list of id-state-action-state transitions that interpolate between ``prev_state`` and ``cur_state``.
+        A pandas DataFrame of transitions that interpolate between ``prev_state`` and ``cur_state``. Optionally appends
+        the coordinate values of each ``prev_state`` as additional columns.
     """
-    ids = []
-    prevs = []
-    acts = []
-    curs = []
+    # retrieves transition data
+    traj_num = int(row['ID'])
+    prev_state = int(row['PREV'])
+    cur_state = int(row['CUR'])
+    num_cols = grid_params['num_cols']
 
     # gets row, column decomposition for previous and current states
     prev_row = prev_state // num_cols
@@ -509,71 +475,92 @@ def get_action_arb(traj_num, prev_state, cur_state, num_cols):
             y += 1
         action_num += 1
 
-    ids.append(traj_num)
-    prevs.append(prev_state)
-    acts.append(action_num)
-    curs.append(cur_state)
+    # prepares final data dictionary to build DataFrame
+    out_data = {'ID': [traj_num, ], 'PREV': [prev_state, ], 'ACT': [action_num, ], 'CUR': [cur_state, ]}
 
-    # return output as one id-state-action-state list within another list for compatibility with other methods
-    # return [[traj_num, prev_state, action_num, cur_state], ]
-    out_df = pd.DataFrame({'ID': ids, 'PREV': prevs, 'ACT': acts, 'CUR': curs})
+    # overwrites the coordinates of the first state in interpolated transitions to be original raw values
+    if options['append_coords']:
+        out_data['LON'] = [row['LON'], ]
+        out_data['LAT'] = [row['LAT'], ]
+
+    # returns final output as DataFrame
+    out_df = pd.DataFrame(out_data)
     return out_df
 
 
-def get_action_interp_with_diag(traj_num, prev_state, cur_state, num_cols):
+def get_action_interp_with_diag(row, options, grid_params):
     """Calculates the actions taken from the previous state to reach the current state, interpolating if necessary.
 
-        First, the relative offset between the current and previous state in rows and columns is calculated.
-        Then the sign of ``rel_row`` and ``rel_col`` are then used to iteratively describe a sequence of actions
-        from the previous state to current state, breaking up state transitions with multiple actions if
-        the states are not adjacent (including diagonals, resulting in 9 possible actions). This interpolation
-        assumes a deterministic system.
+    First, the relative offset between the current and previous state in rows and columns is calculated.
+    Then the sign of ``rel_row`` and ``rel_col`` are then used to iteratively describe a sequence of actions
+    from the previous state to current state, breaking up state transitions with multiple actions if
+    the states are not adjacent (including diagonals, resulting in 9 possible actions). This interpolation
+    assumes a deterministic system.
 
-        For example, if ``prev_state = 5``, ``cur_state = 7``, and ``num_cols = 4``, then our state grid is populated
-        as follows:
+    For example, if ``prev_state = 5``, ``cur_state = 7``, and ``num_cols = 4``, then our state grid is populated
+    as follows:
 
-        8  9 10 11
-        4  p  6  c
-        0  1  2  3
+    8  9 10 11
+    4  p  6  c
+    0  1  2  3
 
-        output: ``[]``
+    output: ``pd.DataFrame({})``
 
-        Where p represents the location of the previous state, and c represents the location of the current state.
-        Then the current state's position relative to the previous state is ``rel_row = 0``, ``rel_col = 2``. Our
-        action spiral then looks like this:
+    Where p represents the location of the previous state, and c represents the location of the current state.
+    Then the current state's position relative to the previous state is ``rel_row = 0``, ``rel_col = 2``. Our
+    action spiral then looks like this:
 
-        4  3  2      4  3  2
-        5  0  1  ->  5  p  1  c
-        7  8  9      6  7  8
+    4  3  2      4  3  2
+    5  0  1  ->  5  p  1  c
+    7  8  9      6  7  8
 
-        output: ``[[traj_num, prev_state, 1, prev_state + 1]]``
+    output: ``pd.DataFrame({
+                            'ID': [traj_num, ],
+                            'PREV': [prev_state, ],
+                            'ACT': [1, ],
+                            'CUR': [prev_state + 1, ]
+                            })``
 
-        Because the current state is not adjacent (including diagonals), we interpolate by taking the action that
-        brings us closest to the current state: action 1, resulting in a new action spiral and a new previous state.
+    Because the current state is not adjacent (including diagonals), we interpolate by taking the action that
+    brings us closest to the current state: action 1, resulting in a new action spiral and a new previous state.
 
-        4  3  2      4  3  2
-        5  0  1  ->  5  p  c
-        7  8  9      6  7  8
+    4  3  2      4  3  2
+    5  0  1  ->  5  p  c
+    7  8  9      6  7  8
 
-        output: ``[[traj_num, prev_state, 1, prev_state + 1], [traj_num, prev_state + 1, 1, cur_state]]``
+    output: ``pd.DataFrame({
+                            'ID': [traj_num] * 2,
+                            'PREV': [prev_state, prev_state + 1],
+                            'ACT': [1, 1],
+                            'CUR': [prev_state + 1, cur_state]
+                            })``
 
-        Now, our new previous state is adjacent to the current state, so we can take action 1, which updates our
-        previous state to exactly match the current state, so the algorithm terminates and returns the list of
-        state-action-state transitions.
+    Now, our new previous state is adjacent to the current state, so we can take action 1, which updates our
+    previous state to exactly match the current state, so the algorithm terminates and returns the list of
+    state-action-state transitions.
 
-        Args:
-            traj_num: the trajectory id number represented as an integer.
-            prev_state: the state that preceded the current state represented as an integer.
-            cur_state: the state that the system is currently in represented as an integer.
-            num_cols: the number of columns in each row on the grid represented as an integer.
+    Args:
+        row: a pandas Series representing one row of the DataFrame the function is applied to, containing the trajectory
+        number, previous state, current state, longitude, and latitude.
+        options: The options specified by the user in ``config_file`` on how to run the script.
+        grid_params: Specifies the minimum and maximum latitudes and longitudes in the dataset.
 
-        Returns:
-            A list of id-state-action-state transitions that interpolate between ``prev_state`` and ``cur_state``.
+    Returns:
+        A pandas DataFrame of transitions that interpolate between ``prev_state`` and ``cur_state``. Optionally
+        appends the coordinate values of each ``prev_state`` as additional columns.
     """
-    ids = []
+    # retrieves transition data
+    traj_num = int(row['ID'])
+    prev_state = int(row['PREV'])
+    cur_state = int(row['CUR'])
+    num_cols = grid_params['num_cols']
+
+    # instantiate lists to hold column values for final DataFrame output
     prevs = []
     acts = []
     curs = []
+    lons = []
+    lats = []
 
     # gets row, column decomposition for previous and current states
     prev_row = prev_state // num_cols
@@ -618,75 +605,108 @@ def get_action_interp_with_diag(traj_num, prev_state, cur_state, num_cols):
         temp_state = temp_row * num_cols + temp_col
         prev_state = prev_row * num_cols + prev_col
 
-        # adds another state-action-state interpolation to the trajectory
-        # out_rows.append([traj_num, prev_state, action, temp_state])
-        ids.append(traj_num)
+        # records an interpolated state-action-state transition
         prevs.append(prev_state)
         acts.append(action)
-        curs.append(cur_state)
+        curs.append(temp_state)
+
+        # gets the coordinates of the interpolated state - will be the coordinates of the middle of the state
+        if options['append_coords']:
+            lon, lat = state_to_coord(prev_state, options, grid_params)
+            lons.append(lon)
+            lats.append(lat)
 
         prev_row = temp_row
         prev_col = temp_col
 
-    # return out_rows
-    out_df = pd.DataFrame({'ID': ids, 'PREV': prevs, 'ACT': acts, 'CUR': curs})
+    # prepares final data dictionary to build DataFrame
+    out_data = {'ID': [traj_num] * len(prevs), 'PREV': prevs, 'ACT': acts, 'CUR': curs}
+
+    # overwrites the coordinates of the first state in interpolated transitions to be original raw values
+    if options['append_coords']:
+        lons[0] = row['LON']
+        lats[0] = row['LAT']
+        out_data['LON'] = lons
+        out_data['LAT'] = lats
+
+    # returns final output as DataFrame
+    out_df = pd.DataFrame(out_data)
     return out_df
 
 
-def get_action_interp_reg(traj_num, prev_state, cur_state, num_cols):
+def get_action_interp_reg(row, options, grid_params):
     """Calculates the actions taken from the previous state to reach the current state, interpolating if necessary.
 
-        First, the relative offset between the current and previous state in rows and columns is calculated.
-        Then the sign of ``rel_row`` and ``rel_col`` are then used to iteratively describe a sequence of actions
-        from the previous state to current state, breaking up state transitions with multiple actions if
-        the states are not adjacent (only actions are right, left, up, down, and none). This interpolation
-        assumes a deterministic system.
+    First, the relative offset between the current and previous state in rows and columns is calculated.
+    Then the sign of ``rel_row`` and ``rel_col`` are then used to iteratively describe a sequence of actions
+    from the previous state to current state, breaking up state transitions with multiple actions if
+    the states are not adjacent (only actions are right, left, up, down, and none). This interpolation
+    assumes a deterministic system.
 
-        For example, if ``prev_state = 5``, ``cur_state = 7``, and ``num_cols = 4``, then our state grid is populated
-        as follows:
+    For example, if ``prev_state = 5``, ``cur_state = 7``, and ``num_cols = 4``, then our state grid is populated
+    as follows:
 
-        8  9 10 11
-        4  p  6  c
-        0  1  2  3
+    8  9 10 11
+    4  p  6  c
+    0  1  2  3
 
-        output: ``[]``
+    output: ``pd.DataFrame({})``
 
-        Where p represents the location of the previous state, and c represents the location of the current state.
-        Then the current state's position relative to the previous state is ``rel_row = 0``, ``rel_col = 2``. Our action
-        spiral then looks like this:
+    Where p represents the location of the previous state, and c represents the location of the current state.
+    Then the current state's position relative to the previous state is ``rel_row = 0``, ``rel_col = 2``. Our action
+    spiral then looks like this:
 
-           2            2
-        3  0  1  ->  3  p  1  c
-           4            4
+       2            2
+    3  0  1  ->  3  p  1  c
+       4            4
 
-        output: ``[[traj_num, prev_state, 1, prev_state + 1]]``
+    output: ``pd.DataFrame({
+                            'ID': [traj_num, ],
+                            'PREV': [prev_state, ],
+                            'ACT': [1, ],
+                            'CUR': [prev_state + 1, ]
+                            })``
 
-        Because the current state is not adjacent, we interpolate by taking the action that brings us closest to
-        the current state: action 1, resulting in a new action spiral and a new previous state.
+    Because the current state is not adjacent, we interpolate by taking the action that brings us closest to
+    the current state: action 1, resulting in a new action spiral and a new previous state.
 
-           2            1
-        3  0  1  ->  2  p  c
-           4            4
+       2            1
+    3  0  1  ->  2  p  c
+       4            4
 
-        output: ``[[traj_num, prev_state, 1, prev_state + 1], [traj_num, prev_state + 1, 1, cur_state]]``
+    output: ``pd.DataFrame({
+                            'ID': [traj_num] * 2,
+                            'PREV': [prev_state, prev_state + 1],
+                            'ACT': [1, 1],
+                            'CUR': [prev_state + 1, cur_state]
+                            })``
 
-        Now, our new previous state is adjacent to the current state, so we can take action 1, which updates our
-        previous state to exactly match the current state, so the algorithm terminates and returns the list of
-        state-action-state transitions.
+    Now, our new previous state is adjacent to the current state, so we can take action 1, which updates our
+    previous state to exactly match the current state, so the algorithm terminates and returns the list of
+    state-action-state transitions.
 
-        Args:
-            traj_num: the trajectory id number represented as an integer.
-            prev_state: the state that preceded the current state represented as an integer.
-            cur_state: the state that the system is currently in represented as an integer.
-            num_cols: the number of columns in each row on the grid represented as an integer.
+    Args:
+        row: a pandas Series representing one row of the DataFrame the function is applied to, containing the
+        trajectory number, previous state, current state, longitude, and latitude.
+        options: The options specified by the user in ``config_file`` on how to run the script.
+        grid_params: Specifies the minimum and maximum latitudes and longitudes in the dataset.
 
-        Returns:
-            A list of id-state-action-state transitions that interpolate between ``prev_state`` and ``cur_state``.
+    Returns:
+        A pandas DataFrame of transitions that interpolate between ``prev_state`` and ``cur_state``. Optionally
+        appends the coordinate values of each ``prev_state`` as additional columns.
     """
-    ids = []
+    # retrieves transition data
+    traj_num = int(row['ID'])
+    prev_state = int(row['PREV'])
+    cur_state = int(row['CUR'])
+    num_cols = grid_params['num_cols']
+
+    # instantiate lists to hold column values for final DataFrame output
     prevs = []
     acts = []
     curs = []
+    lons = []
+    lats = []
 
     # gets row, column decomposition for previous and current states
     prev_row = prev_state // num_cols
@@ -731,20 +751,54 @@ def get_action_interp_reg(traj_num, prev_state, cur_state, num_cols):
         temp_state = temp_row * num_cols + temp_col
         prev_state = prev_row * num_cols + prev_col
 
-        # adds another state-action-state interpolation to the trajectory
-        # out_rows.append([traj_num, prev_state, action, temp_state])
-
-        ids.append(traj_num)
+        # records an interpolated state-action-state transition
         prevs.append(prev_state)
         acts.append(action)
         curs.append(temp_state)
 
+        # gets the coordinates of the interpolated state - will be the coordinates of the middle of the state
+        if options['append_coords']:
+            lon, lat = state_to_coord(prev_state, options, grid_params)
+            lons.append(lon)
+            lats.append(lat)
+
         prev_row = temp_row
         prev_col = temp_col
 
-    # return out_rows
-    out_df = pd.DataFrame({'ID': ids, 'PREV': prevs, 'ACT': acts, 'CUR': curs})
+    # prepares final data dictionary to build DataFrame
+    out_data = {'ID': [traj_num] * len(acts), 'PREV': prevs, 'ACT': acts, 'CUR': curs}
+
+    # overwrites the coordinates of the first state in interpolated transitions to be original raw values
+    if options['append_coords']:
+        lons[0] = row['LON']
+        lats[0] = row['LAT']
+        out_data['LON'] = lons
+        out_data['LAT'] = lats
+
+    # returns final output as DataFrame
+    out_df = pd.DataFrame(out_data)
     return out_df
+
+
+def state_to_coord(state, options, grid_params):
+    """Inverse function for ``get_state``.
+
+    Takes in a discretized state, the coordinate precision, and the grid parameters to calculate the coordinates of the
+    middle of the state in the grid.
+
+    Args:
+        state: The discretized grid square returned by ``get_state``.
+        options: The options specified by the user in ``config_file`` on how to run the script.
+        grid_params: Specifies the minimum and maximum latitudes and longitudes in the dataset.
+
+    Returns:
+        The longitude and latitude representing the middle of the state passed in.
+    """
+    state_col = state % grid_params['num_cols']
+    state_row = state // grid_params['num_cols']
+    state_lon = round(grid_params['min_lon'] + grid_params['grid_len'] * (state_col + 0.5), options['prec_coords'])
+    state_lat = round(grid_params['min_lat'] + grid_params['grid_len'] * (state_row + 0.5), options['prec_coords'])
+    return state_lon, state_lat
 
 
 if __name__ == '__main__':
