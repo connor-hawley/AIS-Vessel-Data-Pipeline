@@ -8,6 +8,8 @@
 DELETE_ZIPPED=true
 # specify whether or not to clear files already extracted before downloading new ones
 CLEAR_BEFORE_DOWNLOAD=false
+# specify the output path for the files to be downloaded
+OUTPUT_DIR="./"
 
 SITE="https://coast.noaa.gov/htdata/CMSP/AISDataHandler/"
 # NOTE: all begin/end values are inclusive
@@ -50,15 +52,10 @@ get_file () {
 }
 
 # sets output directory to specified value or loads it from command line argument
-OUTPUT_DIR=""
 if [[ (! -z "$1" && ! -z "$2" && ! -z "$3" && ! -z "$4") || \
    ( ! -z "$1" && -z "$2" ) ]]; then
    OUTPUT_DIR="$1"
-else
-    OUTPUT_DIR="./"
 fi
-
-echo "$OUTPUT_DIR"
 
 # changes to specified output directory before downloading the data
 OUTPUT_FILE="AIS_ASCII_BY_UTM_Month"
