@@ -12,6 +12,7 @@ pyyaml = "*"
 datetime = "*"
 jupyter = "*"
 plotly = "*"
+geojson = "*"
 
 [requires]
 python_version = "3.7"
