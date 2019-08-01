@@ -48,7 +48,12 @@ def main():
 
     # writes file metadata, paths, and grid parameters to ``meta_file``
     directories_out = {'in_dir_path': directories['out_dir_path'], 'in_dir_data': directories['out_dir_file']}
-    out_dict = {'all_files_meta': all_files_meta, 'directories': directories_out, 'grid_params': grid_params}
+    out_dict = {
+        'all_files_meta': all_files_meta,
+        'options': options,
+        'directories': directories_out,
+        'grid_params': grid_params
+    }
     with open(meta_file, 'w') as outfile:
         yaml.dump(out_dict, outfile, default_flow_style=False)
 
