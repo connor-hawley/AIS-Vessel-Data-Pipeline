@@ -41,8 +41,8 @@ meta_params:
 grid_params:
     min_lon   : -76.0  # the minimum longitude that will be considered
     max_lon   : -72.0  # the maximum longitude that will be considered
-    min_lat   : 35.0   # the minimum latitude that will be considered
-    max_lat   : 42.0   # the maximum latitude that will be considered
+    min_lat   : 25.0   # the minimum latitude that will be considered
+    max_lat   : 50.0   # the maximum latitude that will be considered
     num_cols  : 0      # the number of columns in the final grid, which will be automatically calculated by the script
-    grid_len  : 1.0    # the length of one side of one grid square, in degrees
+    grid_len  : 0.5    # the length of one side of one grid square, in degrees
 
