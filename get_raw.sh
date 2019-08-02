@@ -18,16 +18,16 @@ YEAR_BEGIN=2015
 YEAR_END=2017
 # data available for all months (1 - 12)
 # do not prefix single digit months with zero - the script takes care of that
-MONTH_BEGIN=3
-MONTH_END=9
+MONTH_BEGIN=1
+MONTH_END=12
 # the zones are Universal Transverse Mercator (UTM) zones, defined longitudinally in 6 degree increments
 # with zone 1 being 180 W - 174 W
 # zone description: 1 - 9 -> Alaska, 4 - 5 -> Hawaii, 9 - 20 -> continental US
 # zones ascending zones correspond to west to east longitude. see originating site for more information
 # data available for zones 1 - 20
 # do not prefix single digit zones with zero - the script takes care of that
-ZONE_BEGIN=18
-ZONE_END=18
+ZONE_BEGIN=15
+ZONE_END=20
 
 # Retrieves an individual year, month, zone tuple's filename
 get_file () {

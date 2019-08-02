@@ -236,6 +236,7 @@ def write_data(trajectories, options, directories, grid_params):
 
     # aliases the MMSI column to ascending integers to enumerate trajectories and make easier to read
     alias = {mmsi: ind for ind, mmsi in enumerate(trajectories['MMSI'].unique())}
+    trajectories['MMSI'] = trajectories['MMSI'].map(alias)
     trajectories.replace({"MMSI": alias}, inplace=True)
 
     # resets index now that manipulation of this dataframe has finished
@@ -262,18 +263,13 @@ def write_data(trajectories, options, directories, grid_params):
             lons += traj['LON']
             lats += traj['LAT']
 
-    # prepare final dictionary with built lists
-    sas_data = {'ID': ids, 'PREV': prevs, 'ACT': acts, 'CUR': curs}
+    # prepare final dictionary with built lists and proper heading name
+    sas_data = {'sequence_id': ids, 'from_state_id': prevs, 'action_id': acts, 'to_state_id': curs}
     if options['append_coords']:
-        sas_data['LON'] = lons
-        sas_data['LAT'] = lats
+        sas_data['lon'] = lons
+        sas_data['lat'] = lats
 
     sas = pd.DataFrame(sas_data)
-
-    # merges the series of stacked dataframes into one dataframe and resets the index
-    # sas = pd.concat(sas.tolist())
-    # sas.reset_index(drop=True, inplace=True)
-
     # writes new dataframe to final csv
     sas.to_csv(directories['out_dir_path'] + directories['out_dir_file'], index=False)
 
