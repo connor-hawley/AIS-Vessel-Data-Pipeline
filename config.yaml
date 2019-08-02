@@ -39,7 +39,7 @@ meta_params:
 # this will track the minimum and maximum latitudes and longitudes in the dataset if bound_lat and bound_lon are False
 # otherwise, grid_params specifies the grid boundaries in degrees.
 grid_params:
-    min_lon   : -76.0  # the minimum longitude that will be considered
+    min_lon   : -78.0  # the minimum longitude that will be considered
     max_lon   : -72.0  # the maximum longitude that will be considered
     min_lat   : 25.0   # the minimum latitude that will be considered
     max_lat   : 50.0   # the maximum latitude that will be considered

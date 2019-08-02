@@ -8,7 +8,6 @@ with the discretized states, inferred actions, and records the resulting grid pa
 import yaml
 import os
 import math
-import datetime
 import numpy as np
 import pandas as pd
 
@@ -156,8 +155,8 @@ def read_data(csv_files, options, grid_params):
         ais_df = pd.read_csv(csv_file, usecols=usecols, nrows=nrows)
         ais_df = ais_df[usecols]
 
-        # Interprets raw time entries as timestamps and drops original column
-        ais_df['TIME'] = ais_df['BaseDateTime'].apply(get_time)
+        # interprets raw time entries as datetime objects and drops original column
+        ais_df['TIME'] = pd.to_datetime(ais_df['BaseDateTime'], format="%Y-%m-%dT%H:%M:%S")
         ais_df.drop(columns='BaseDateTime', inplace=True)
 
         # keeps only rows in boundaries if specified
@@ -219,7 +218,8 @@ def write_data(trajectories, options, directories, grid_params):
     trajectories.drop(columns='TIME', inplace=True)
 
     # creates a new column of discretized states based on coordinate pairs
-    trajectories['STATE'] = trajectories.apply(lambda x: get_state(x['LON'], x['LAT'], grid_params), axis=1)
+    # trajectories['STATE'] = trajectories.apply(lambda x: get_state(x['LON'], x['LAT'], grid_params), axis=1)
+    trajectories['STATE'] = get_state(trajectories['LON'].values, trajectories['LAT'].values, grid_params)
 
     # looks at state differences within MMSI trajectories and only keeps the states with nonzero differences
     # trajectories with only one state are kept because they will have a first row with 'nan' for diff
@@ -246,9 +246,33 @@ def write_data(trajectories, options, directories, grid_params):
     if isinstance(sas, pd.DataFrame):  # becomes a DataFrame when every trajectory has only one sas triplet
         sas = sas[0]
 
+    # merge Series of dictionaries
+    ids = []
+    prevs = []
+    acts = []
+    curs = []
+    lons = []
+    lats = []
+    for traj in sas:
+        ids += traj['ID']
+        prevs += traj['PREV']
+        acts += traj['ACT']
+        curs += traj['CUR']
+        if options['append_coords']:
+            lons += traj['LON']
+            lats += traj['LAT']
+
+    # prepare final dictionary with built lists
+    sas_data = {'ID': ids, 'PREV': prevs, 'ACT': acts, 'CUR': curs}
+    if options['append_coords']:
+        sas_data['LON'] = lons
+        sas_data['LAT'] = lats
+
+    sas = pd.DataFrame(sas_data)
+
     # merges the series of stacked dataframes into one dataframe and resets the index
-    sas = pd.concat(sas.tolist())
-    sas.reset_index(drop=True, inplace=True)
+    # sas = pd.concat(sas.tolist())
+    # sas.reset_index(drop=True, inplace=True)
 
     # writes new dataframe to final csv
     sas.to_csv(directories['out_dir_path'] + directories['out_dir_file'], index=False)
@@ -298,25 +322,6 @@ def get_meta_data(file_name):
     return year, month, zone
 
 
-def get_time(time_str):
-    """Uses the datetime library to calculate a timestamp object from a ``time_str``.
-
-    Takes in a timestamp string, breaks it down into its components, and then calls the datetime library
-    to construct a datetime object for easier manipulation and time calculations between data entries.
-
-    Args:
-        time_str: A timestamp string formatted as 'YYYY-MM-DDTHH:MM:SS'.
-
-    Returns:
-        A timestamp object corresponding exactly to the timestamp string passed in.
-    """
-    date, time = time_str.split('T')
-    year, month, day = date.split('-')
-    hour, minute, second = time.split(':')
-    dt = datetime.datetime(int(year), int(month), int(day), hour=int(hour), minute=int(minute), second=int(second))
-    return dt.timestamp()
-
-
 def get_state(cur_lon, cur_lat, grid_params):
     """Discretizes a coordinate pair into its state space representation in a Euclidean grid.
 
@@ -350,7 +355,7 @@ def get_state(cur_lon, cur_lat, grid_params):
     col = cur_lon // grid_params['grid_len']
     row = cur_lat // grid_params['grid_len']
     # find total state based on num_cols in final grid
-    return int(row * grid_params['num_cols'] + col)
+    return (row * grid_params['num_cols'] + col).astype(int)
 
 
 def get_action(traj, options, grid_params):
@@ -371,20 +376,17 @@ def get_action(traj, options, grid_params):
     # retrieves trajectory data
     traj_num = traj.name
     states = traj['STATE']
+    last_state = states.iloc[-1]
     lon = traj['LON']
     lat = traj['LAT']
 
     # prepares a dictionary of state transitions to be fed row-by-row as a DataFrame to the interpolation functions
-    data = {
-        'ID': pd.Series([traj_num] * (len(states) - 1)),
-        'PREV': states.iloc[:-1].reset_index(drop=True),
-        'CUR': states.iloc[1:].reset_index(drop=True)
-    }
+    data = {'ID': [traj_num] * (len(states) - 1), 'PREV': states.iloc[:-1].values, 'CUR': states.iloc[1:].values}
 
     # if specified, appends the original entry coordinates (not discretized) for each 'PREV' entry
     if options['append_coords']:
-        data['LON'] = lon[:-1].reset_index(drop=True)
-        data['LAT'] = lat[:-1].reset_index(drop=True)
+        data['LON'] = lon.iloc[:-1].values
+        data['LAT'] = lat.iloc[:-1].values
 
     # formats the final data dictionary as a DataFrame
     traj_df = pd.DataFrame(data)
@@ -398,14 +400,32 @@ def get_action(traj, options, grid_params):
         else:
             traj_df = traj_df.apply(lambda x: get_action_interp_reg(x, options, grid_params), axis=1)
 
+    # merges the dictionary series
+    states_out = []
+    acts_out = []
+    lon_out = []
+    lat_out = []
+    for traj in traj_df:
+        states_out += traj['PREV']
+        acts_out += traj['ACT']
+        if options['append_coords']:
+            lon_out += traj['LON']
+            lat_out += traj['LAT']
+    states_out.append(last_state)
+
     # appends the final state to each trajectory as its own row to allow for easier plotting of trajectories
     if options['append_coords']:
-        final_state = {'ID': traj_num, 'PREV': states.iloc[-1], 'ACT': -1, 'CUR': -1, 'LON': lon.iloc[-1],
-                       'LAT': lat.iloc[-1]}
-        last_row = pd.DataFrame(final_state, index=[0, ])
-        traj_df = pd.concat([traj_df, pd.Series(data={0: last_row})], ignore_index=True)
+        states_out.append(-1)
+        acts_out.append(-1)
+        lon_out.append(lon.iloc[-1])
+        lat_out.append(lat.iloc[-1])
 
-    return traj_df
+    data_out = {'ID': [traj_num] * len(acts_out), 'PREV': states_out[:-1], 'ACT': acts_out, 'CUR': states_out[1:]}
+    if options['append_coords']:
+        data_out['LON'] = lon_out
+        data_out['LAT'] = lat_out
+
+    return data_out
 
 
 def get_action_arb(row, options, grid_params):
@@ -445,9 +465,9 @@ def get_action_arb(row, options, grid_params):
         the coordinate values of each ``prev_state`` as additional columns.
     """
     # retrieves transition data
-    traj_num = int(row['ID'])
-    prev_state = int(row['PREV'])
-    cur_state = int(row['CUR'])
+    traj_num = row['ID'].astype(int)
+    prev_state = row['PREV'].astype(int)
+    cur_state = row['CUR'].astype(int)
     num_cols = grid_params['num_cols']
 
     # gets row, column decomposition for previous and current states
@@ -488,9 +508,7 @@ def get_action_arb(row, options, grid_params):
         out_data['LON'] = [row['LON'], ]
         out_data['LAT'] = [row['LAT'], ]
 
-    # returns final output as DataFrame
-    out_df = pd.DataFrame(out_data)
-    return out_df
+    return out_data
 
 
 def get_action_interp_with_diag(row, options, grid_params):
@@ -555,9 +573,9 @@ def get_action_interp_with_diag(row, options, grid_params):
         appends the coordinate values of each ``prev_state`` as additional columns.
     """
     # retrieves transition data
-    traj_num = int(row['ID'])
-    prev_state = int(row['PREV'])
-    cur_state = int(row['CUR'])
+    traj_num = row['ID'].astype(int)
+    prev_state = row['PREV'].astype(int)
+    cur_state = row['CUR'].astype(int)
     num_cols = grid_params['num_cols']
 
     # instantiate lists to hold column values for final DataFrame output
@@ -634,9 +652,7 @@ def get_action_interp_with_diag(row, options, grid_params):
         out_data['LON'] = lons
         out_data['LAT'] = lats
 
-    # returns final output as DataFrame
-    out_df = pd.DataFrame(out_data)
-    return out_df
+    return out_data
 
 
 def get_action_interp_reg(row, options, grid_params):
@@ -701,9 +717,9 @@ def get_action_interp_reg(row, options, grid_params):
         appends the coordinate values of each ``prev_state`` as additional columns.
     """
     # retrieves transition data
-    traj_num = int(row['ID'])
-    prev_state = int(row['PREV'])
-    cur_state = int(row['CUR'])
+    traj_num = row['ID'].astype(int)
+    prev_state = row['PREV'].astype(int)
+    cur_state = row['CUR'].astype(int)
     num_cols = grid_params['num_cols']
 
     # instantiate lists to hold column values for final DataFrame output
@@ -723,7 +739,6 @@ def get_action_interp_reg(row, options, grid_params):
     rel_col = cur_col - prev_col
 
     # write output rows until rel_row and rel_col are both zero
-    # out_rows = []
     while not(rel_row == 0 and rel_col == 0):
         # selects action to reduce the largest of rel_row and rel_col
         action = -1
@@ -780,9 +795,7 @@ def get_action_interp_reg(row, options, grid_params):
         out_data['LON'] = lons
         out_data['LAT'] = lats
 
-    # returns final output as DataFrame
-    out_df = pd.DataFrame(out_data)
-    return out_df
+    return out_data
 
 
 def state_to_coord(state, options, grid_params):
