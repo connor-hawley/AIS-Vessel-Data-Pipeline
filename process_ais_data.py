@@ -218,7 +218,6 @@ def write_data(trajectories, options, directories, grid_params):
     trajectories.drop(columns='TIME', inplace=True)
 
     # creates a new column of discretized states based on coordinate pairs
-    # trajectories['STATE'] = trajectories.apply(lambda x: get_state(x['LON'], x['LAT'], grid_params), axis=1)
     trajectories['STATE'] = get_state(trajectories['LON'].values, trajectories['LAT'].values, grid_params)
 
     # looks at state differences within MMSI trajectories and only keeps the states with nonzero differences
@@ -237,7 +236,6 @@ def write_data(trajectories, options, directories, grid_params):
     # aliases the MMSI column to ascending integers to enumerate trajectories and make easier to read
     alias = {mmsi: ind for ind, mmsi in enumerate(trajectories['MMSI'].unique())}
     trajectories['MMSI'] = trajectories['MMSI'].map(alias)
-    trajectories.replace({"MMSI": alias}, inplace=True)
 
     # resets index now that manipulation of this dataframe has finished
     trajectories.reset_index(drop=True, inplace=True)
@@ -345,11 +343,11 @@ def get_state(cur_lon, cur_lat, grid_params):
         grid parameters passed in.
     """
     # normalize lat and lon to the minimum values
-    cur_lon -= grid_params['min_lon']
-    cur_lat -= grid_params['min_lat']
+    norm_lon = cur_lon - grid_params['min_lon']
+    norm_lat = cur_lat - grid_params['min_lat']
     # find the row and column position based on grid_len
-    col = cur_lon // grid_params['grid_len']
-    row = cur_lat // grid_params['grid_len']
+    col = norm_lon // grid_params['grid_len']
+    row = norm_lat // grid_params['grid_len']
     # find total state based on num_cols in final grid
     return (row * grid_params['num_cols'] + col).astype(int)
 

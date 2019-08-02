@@ -9,7 +9,7 @@ options:
     bound_zone     : True     # specifies whether to bound the zones being read
     interp_actions : True     # specifies whether to interpolate actions if state transitions are not adjacent, otherwise actions can be arbitrarily large
     allow_diag     : False    # when interp_actions is true, specifies whether to allow for diagonal grid actions or not
-    append_coords  : False    # specifies whether to add raw latitude, longitude values as columns to the output csv
+    append_coords  : True     # specifies whether to add raw latitude, longitude values as columns to the output csv
     prec_coords    : 3        # the number of decimal places to round each coordinate to
     min_states     : 2        # set minimum number of states in a trajectory necessary to qualify it for the output file
 
