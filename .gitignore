@@ -3,16 +3,20 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# repo outputs
 AIS_ASCII_by_UTM_Month/*
 *.csv
 
+# mac
 .DS_Store
+
+# jetbrains ide
 .idea
 
+# side effects of running script
 .ipynb_checkpoints
-
 meta_data.yaml
 
-# Documentation builds
+# documentation builds
 docs/build/*
 docs/source/api/*

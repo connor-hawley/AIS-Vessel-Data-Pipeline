@@ -3,6 +3,7 @@
 # total 2017 dataset is about 80GB, so a small subset should be manageable on a laptop/desktop environment
 # if only one tuple of year, month, and zone is desired, then use command-line argument './get_raw.sh year month zone'
 # if more than one tuple of year, month, and zone is desired, then use command-line argument './get_raw.sh' and modify the parameters in this document
+# either of the above command line arguments can be used with the output directory specified as the first argument
 
 # specify whether or not to delete zipped files that are downloaded during execution
 DELETE_ZIPPED=true
