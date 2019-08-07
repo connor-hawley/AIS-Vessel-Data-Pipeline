@@ -13,6 +13,11 @@ datetime = "*"
 jupyter = "*"
 plotly = "*"
 geojson = "*"
+sphinx = "*"
+recommonmark = "*"
+nbsphinx = "*"
+sphinx-rtd-theme = "*"
+sphinx-automodapi = "*"
 
 [requires]
 python_version = "3.7"

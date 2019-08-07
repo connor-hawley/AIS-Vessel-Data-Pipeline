@@ -26,13 +26,13 @@ If you have pip installed and can easily run python 3, then installing required 
 
 If the above command runs successfully, you should be ready to run the programs in the worflow.
 
-# Workflow
+# Pipeline Workflow
 - ``get_raw.sh`` - run this file first to download and unzip the dataset. A command line argument may be used to specify the year, month, and zone, or without a command line argument, all files within the year, month, and zone ranges will be downloaded, according to the boundaries specified in the file. Optionally, the output directory path can be specified as another command line argument, either by itself or preceding the year, month, and zone arguments. Read the top of the file for more details on what each parameter does.
 - ``process_ais_data.py`` - once ``get_raw.sh`` has finished downloading and unzipping the desired files, ``process_ais_data.py`` processes all the desired csv files to condense them into a final sequence file that can be used as an input to algorithms. ``process_ais_data.py`` has flexibility in how it pre-processes the data, which is described in ``config.yaml``. The coordinate grid can be bounded, certain time and zone ranges can be specified, and more. See ``config.yaml`` and ``process_ais_data.py`` for more details on what all the options and functionality are.
 - ``AIS_demo_data.ipynb`` - once ``get_raw.sh`` and ``process_ais_data.py`` have been run as desired, this Jupyter Notebook uses pandas and plotly to map trajectories on an interactive map to demonstrate how the pipeline has processed the data. If you are unfamiliar with Jupyter notebooks, run ``jupyter notebook`` and select this file to run it interactively.
 
-## Workflow options
-### ``get_raw.sh``
+# Options
+## ``get_raw.sh``
 - ``DELETE_ZIPPED`` - specify whether or not to delete zipped files that are downloaded during execution.
 - ``CLEAR_BEFORE_DOWNLOAD`` - specify whether or not to clear files already extracted before downloading new ones.
 - ``YEAR_BEGIN``, ``MONTH_BEGIN`` - the earliest data to download, inclusive. e.g. ``YEAR_BEGIN=2016, MONTH_BEGIN=3`` would download files beginning with March 2016.
@@ -40,9 +40,9 @@ If the above command runs successfully, you should be ready to run the programs 
 - ``ZONE_BEGIN``, ``ZONE_END`` - the zone range to download (inclusive). Zone description: 1 - 9 -> Alaska, 4 - 5 -> Hawaii, 9 - 20 -> continental US. See ``get_raw.sh`` for more information.
 - ``OUTPUT_DIR`` - the directory where the downloaded files should live once the script completes. The output files will be in the folder ``AIS_ASCII_BY_UTM_Month`` in the specified directory.
 
-### ``process_ais_data.py``
+## ``process_ais_data.py``
 All options for this file are specified in ``config.yaml``, not the file itself.
-#### ``options``
+### ``options``
 The main options that can be specified for script.
 - ``limit_rows`` - specifies whether to only read the first ``max_rows`` of each csv.
 - ``max_rows`` - when ``limit_rows`` is true, specifies the number of rows to read of each CSV file.
@@ -55,20 +55,20 @@ The main options that can be specified for script.
 - ``append_coords`` - specifies whether to add raw latitude, longitude values as columns to the output csv. This will also add an extra row to each trajectory containing just the final state and its original coordinates. When interpolating, the coordinates of the interpolated states will just be the center of the grid squares they represent.
 - ``prec_coords`` - specifies the precision of coordinates in output as the number of decimal places to round each coordinate to.
 - ``min_states`` - specifies the minimum number of sequentially unique discretized states needed to qualify a trajectory for final output, e.g. if ``min_states=3`` then the state trajectory ``1, 2, 1`` would qualify whereas ``1, 1, 2`` would not. In other words, the minimum number of states in a trajectory that were not reached via self-transition.
-#### ``directories``
+### ``directories``
 The input and output directory specification for the script.
 - ``in_dir_path`` - specifies the directory where input data is located.
 - ``in_dir_data`` - specifies the folder name containing all the data in the input directory.
 - ``out_dir_path`` - specifies the directory where output data files should be written.
 - ``out_dir_file`` - specifies output file name (should be .csv).
-#### ``meta_params`` 
+### ``meta_params`` 
 Specifies the same time and zone boundary controls available in ``get_raw.sh``, only considering files within those boundaries. Data are available between 2015 - 2017, January - December, zones 1 - 20.
-####``grid_params``
+###``grid_params``
 When hard boundaries are set in ``options``, those grid boundaries are specified here, except ``grid_len``, which matters regardless.
 - ``grid_len`` - the length of one side of one grid square, in degrees.
 
-## Workflow example
-### Getting the data
+# Example
+## Getting the data
 To get the data, we use ``get_raw.sh``. Let's assume that we want all the data in zone 10 between November 2016 and January 2017 in a file that already exists in our working directory called ``data``. We have 4 options for how to do this:
 
 Option 1: specify everything in command line: <br/>
@@ -82,7 +82,7 @@ Option 4: specify everything in the file, combining options 2 and 3: <br/>
 
 Once the data finishes downloading and inflating, we are ready to preprocess the data.
 
-### Preprocessing the data
+## Preprocessing the data
 To preprocess the data, we use ``process_ais_data.py``. To use the script, ``config.yaml`` should be configured first.<br/><br/>
 
 First, because we put our data in the ``data`` folder in our current directory, we need to change ``directories:in_dir_path``  to ``./data`` to reflect this.<br/><br/>
@@ -135,3 +135,18 @@ This preprocessing program only makes use of the bolded columns above. MMSI maps
 - ``from_state_id`` - the coordinate grid square the ship started in for a given transition, represented as an integer
 - ``action_id`` - the direction and length a ship went to transition between states, represented as an integer. See ``process_ais_data.py`` for more detail
 - ``to_state_id`` - the coordinate grid square the ship ended in for a given transition, represented as an integer
+
+# Building the Docs
+
+Note: this will not work on windows.
+
+To build the docs, go from the main project directory to the ``docs`` directory.<br/>
+``cd docs``<br/><br/>
+
+Then use ``make`` to completely rebuild the docs.<br/>
+``make clean``<br/>
+``make build``<br/><br/>
+
+Given that the docs build correctly, they can be viewed locally by changing to the build output directory and starting a local http server in python.<br/>
+``cd build/html``<br/>
+``python -m http.server``

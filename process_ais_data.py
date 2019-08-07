@@ -3,7 +3,7 @@
 To obtain the needed AIS data, see (and run) ``get_raw.sh``.
 
 Uses information specified in the ``config_file`` to chew through available AIS csv data to generate an output csv file
-with the discretized states, inferred actions, and records the resulting grid parameters in the ``meta_file``.
+with the discretized states, inferred actions, and records metadata for further processing in the ``meta_file``.
 """
 import yaml
 import os
@@ -17,11 +17,14 @@ def main():
 
     First, all the script parameters are loaded by reading the ``.yaml`` ``config_file`` and this config is unpacked.
     All the csv files within a specified directory are found and returned as ``csv_files``, along with each file's
-    year, month, and zone in ``all_files_meta``. Then, these csv files are read and organized into a large
-    set of trajectories ordered by id (mmsi). Finally, these trajectories are discretized before being written into
-    an output csv containing only rows of id-state-action-state transitions. Another yaml file is written to
-    ``meta_file`` to specify the final grid parameters, output directories, and the year, month, and zone of
-    all the files read in.
+    year, month, and zone in ``all_files_meta``.
+
+    Then, these csv files are read and organized into a large set of trajectories ordered by id (mmsi). Finally, these
+    trajectories are discretized before being written into an output csv containing only rows of id-state-action-state
+    transitions.
+
+    Another yaml file is written to ``meta_file`` to specify the final grid parameters, output directories, and the
+    year, month, and zone of all the files read in.
     """
     # file containing important options, directories, parameters, etc.
     config_file = 'config.yaml'
@@ -64,11 +67,11 @@ def get_config(config_file):
     Upon success, this config dictionary is returned to main to be unpacked.
 
     Args:
-        config_file: The name of the ``.yaml`` file containing the script configuration parameters, located in the
+        config_file (str): The name of the ``.yaml`` file containing the script configuration parameters, located in the
             directory the script is run.
 
     Returns:
-        A dictionary of script configuration parameters.
+        dict: The script configuration parameters.
     """
     with open(config_file, 'r') as stream:
         try:
@@ -78,21 +81,19 @@ def get_config(config_file):
 
 
 def collect_csv_files(options, directories, meta_params):
-    """Traverses the directory containing the decompressed AIS data to get the CSV names for further processing.
+    """Traverses the directory containing the decompressed AIS data to get the csv names for further processing.
 
-    Uses the os library to find all csv files within the directory defined by ``directories``, populating the
-    ``csv_files`` list for later reading of all valid csvs found and logging file metadata in ``all_files_meta``.
+    Uses the ``os`` library to find all csv files within the directory defined by ``directories``, populating the
+    ``csv_files`` list for later reading of all valid csv files found and logging file metadata in ``all_files_meta``.
 
     Args:
-        options: The options specified by the user in ``config_file`` on how to run the script.
-        directories: The directories specified by the user in ``config_file`` on where to look for input data, where to
-            write output data, and what those files should be named.
-        meta_params: The parameters specified by the user in ``config_file`` to define time and zone range for the
-            AIS data.
+        options (dict): The script options specified in the ``config_file``.
+        directories (dict): The input and output paths and files specified in the ``config_file``.
+        meta_params (dict): The time and zone boundaries specified in the ``config_file``.
 
     Returns:
-        csv_files: A list of paths to all valid csv files found.
-        all_files_meta: A dictionary listing the year, month, and zone corresponding to each csv file's data.
+        tuple: A list with paths to all valid csv files found and a dictionary with the year, month, and zone
+        corresponding to each csv file's origin.
     """
     # initialize a list that will be filled with all csv file names from root
     csv_files = []
@@ -101,6 +102,7 @@ def collect_csv_files(options, directories, meta_params):
         for file in files:
             if file.endswith(".csv"):
                 year, month, zone = get_meta_data(file)  # finds the data year, month, and zone based on the file name
+
                 # only considers valid years and months if time is bounded and valid zones if zones are bounded
                 if (not options['bound_time'] or (meta_params['min_year'] <= year <= meta_params['max_year'])) and \
                    (not options['bound_zone'] or (meta_params['min_zone'] <= zone <= meta_params['max_zone'])):
@@ -120,21 +122,22 @@ def read_data(csv_files, options, grid_params):
     """Iterate through each csv file to segregate each trajectory by its mmsi id.
 
     Reads each csv in ``csv_files`` to obtain coordinates and timestamp series associated with each mmsi id encountered.
+
     Optionally, the boundaries of the grid later specified can be inferred by calculating the minimum and maximum
-    longitudes and latitudes by setting ``options['bound_lon']`` and ``options['bound_lat']`` to False, respectively
-    in the ``config_file``. It can also be specified to only read the first ``options['max_rows']`` of each csv file by
-    setting ``options['limit_rows']`` to True in the ``config_file``.
+    longitudes and latitudes by setting ``options['bound_lon']`` and ``options['bound_lat']`` to ``False``, respectively
+    in the ``config_file``.
+
+    It can also be specified to only read the first ``options['max_rows']`` of each csv file by setting
+    ``options['limit_rows']`` to True in the ``config_file``.
 
     Args:
-        csv_files: A list of paths to all valid csv files found.
-        options: The options specified by the user in ``config_file`` on how to run the script.
-        grid_params: Specifies the minimum and maximum latitudes and longitudes in the dataset. Will be updated to fit
-            dataset if ``options['bound_lon']`` or ``options['bount_lat']`` is False in the ``config_file``.
+        csv_files (list): Paths to all valid csv files found.
+        options (dict): The script options specified in the ``config_file``.
+        grid_params (dict): The grid parameters specified in the ``config_file``.
 
     Returns:
-        trajectories: A pandas DataFrame of all data entries with the format ``['MMSI', 'LON', 'LAT', 'TIME']``.
-        grid_params: Specifies the minimum and maximum latitudes and longitudes in the dataset. Will be updated to fit
-            dataset if ``options['bound_lon']`` or ``options['bount_lat']`` is False in the ``config_file``.
+        tuple: A pandas DataFrame of all data entries with the format ``['MMSI', 'LON', 'LAT', 'TIME']`` and a
+        dictionary that specifies the minimum and maximum latitudes and longitudes in the dataset.
     """
     # overwrite hard boundaries on longitude and latitude if not bounded in config.yaml
     if not options['bound_lon']:
@@ -188,6 +191,7 @@ def read_data(csv_files, options, grid_params):
     if not options['bound_lat']:
         grid_params['min_lat'] = float(math.floor(grid_params['min_lat']))
         grid_params['max_lat'] = float(math.ceil(grid_params['max_lat']))
+
     # number of columns in the resulting grid
     grid_params['num_cols'] = math.ceil((grid_params['max_lon'] - grid_params['min_lon']) / grid_params['grid_len'])
 
@@ -207,11 +211,10 @@ def write_data(trajectories, options, directories, grid_params):
     trajectories will be discarded since they will never transition between grid squares.
 
     Args:
-        trajectories: A pandas DataFrame of all data entries with the format ``['MMSI', 'LON', 'LAT', 'TIME']``.
-        options: The options specified by the user in ``config_file`` on how to run the script.
-        directories: The directories specified by the user in ``config_file`` on where to look for input data, where to
-            write output data, and what those files should be named.
-        grid_params: Specifies the minimum and maximum latitudes and longitudes in the dataset.
+        trajectories (pandas.DataFrame): All data entries with columns ``['MMSI', 'LON', 'LAT', 'TIME']``.
+        options (dict): The script options specified in the ``config_file``.
+        directories (dict): The input and output paths and files specified in the  ``config_file``.
+        grid_params (dict): The grid parameters specified in the ``config_file``.
     """
     # sorts based on MMSI, then sorts by timestamps within MMSI groups, drops the time column
     trajectories.sort_values(['MMSI', 'TIME'], inplace=True)
@@ -267,8 +270,8 @@ def write_data(trajectories, options, directories, grid_params):
         sas_data['lon'] = lons
         sas_data['lat'] = lats
 
-    sas = pd.DataFrame(sas_data)
     # writes new dataframe to final csv
+    sas = pd.DataFrame(sas_data)
     sas.to_csv(directories['out_dir_path'] + directories['out_dir_file'], index=False)
 
 
@@ -281,13 +284,13 @@ def get_bounds(zone):
     also wraps the zone with a modulo operator, so zone -1 would map to zone 58.
 
     Args:
-        zone: An integer representing the Universal Transverse Mercator coordinate system zone.
+        zone (int): The Universal Transverse Mercator coordinate system zone.
 
     Returns:
-        A tuple ``(min_lon, max_lon)`` of floats corresponding to the minimum and maximum longitudes
-        of the zone passed in.
+        tuple: The minimum and maximum longitudes of the zone passed in.
     """
     min_lon = (6. * ((zone - 1) % 60)) - 180.  # counts 6 degrees per zone, offset by -180
+
     return min_lon, (min_lon + 6.)
 
 
@@ -298,10 +301,10 @@ def get_meta_data(file_name):
     values of ``yyyy, mm, ##`` corresponding to year, month, and zone number as a tuple.
 
     Args:
-        file_name: a string formatted as ``'AIS_yyyy_mm_Zone##.csv'``.
+        file_name (str): The file name to be parsed in format ``'AIS_yyyy_mm_Zone##.csv'``.
 
     Returns:
-        A tuple ``(year, month, zone)`` of integers corresponding the year, month, and zone of the file passed in.
+        tuple: The year, month, and zone corresponding to the filename passed in.
     """
     meta_file_data = file_name.split('_')  # splits csv file on '_' character, which separates relevant file info
     year = int(meta_file_data[-3])  # third to last element of file is the year
@@ -313,41 +316,51 @@ def get_meta_data(file_name):
     zone_raw = ending_data[0]  # gets "ZoneXX" string
     zone_data = zone_raw[-2:]  # gets last 2 characters of "ZoneXX" string - will be the zone number
     zone = int(zone_data)
+
     return year, month, zone
 
 
 def get_state(cur_lon, cur_lat, grid_params):
     """Discretizes a coordinate pair into its state space representation in a Euclidean grid.
 
-    Takes in a coordinate pair ``cur_lon, cur_lat`` and grid parameters ``min_lon, min_lat, num_cols, grid_len``
-    to calculate the integer state representing the given coordinate pair. This coordinate grid is always row-major.
-    ``min_lon, min_lat`` represent the bottom-left corner of the grid.
+    Takes in a coordinate pair ``cur_lon``, ``cur_lat`` and grid parameters to calculate the integer state representing
+    the given coordinate pair. This coordinate grid is always row-major. ``(min_lon, min_lat)`` represent the
+    bottom-left corner of the grid.
 
-    For example, a 3 x 4 grid would have the following state enumeration pattern:
+    Example:
+        A 3 x 4 grid would have the following state enumeration pattern::
 
-    8 9 10 11      (min_lon, min_lat + grid_len)              (min_lon + grid_len, min_lat + grid_len)
-    4 5 6 7                        |
-    0 1 2 3              (min_lon, min_lat) ---------------------- (min_lon + grid_len, min_lon)
+            8 9 10 11
+            4 5 6 7
+            0 1 2 3
 
-    In this example, the top left of state 0's boundaries would be the point ``min_lon, min_lat``, and the total area
-    mapping to state 0 would be the square with ``min_lon, min_lat`` as the top left corner and each side of the
-    square with length ``grid_len``. The inclusive parts of the square's boundaries mapping to zero are solid lines.
+        With each grid square's area bounded in the following way::
+
+            (min_lon, min_lat + grid_len)              (min_lon + grid_len, min_lat + grid_len)
+                      |
+             (min_lon, min_lat) ---------------------- (min_lon + grid_len, min_lon)
+
+        In this example, the bottom left of state 0's boundaries would be the point ``min_lon, min_lat``, and the total
+        area mapping to state 0 would be the square with ``min_lon, min_lat`` as the bottom left corner and each side of
+        the square with length ``grid_len``. The inclusive parts of the square's boundaries mapping to zero are solid
+        lines.
 
     Args:
-        cur_lon: the longitude of the data point represented as a float.
-        cur_lat: the latitude of the data point represented as a float.
-        grid_params: Specifies the minimum and maximum latitudes and longitudes in the dataset.
+        cur_lon (float): The longitude of the data point.
+        cur_lat (float): The latitude of the data point.
+        grid_params (dict): The grid parameters specified in the ``config_file``.
 
     Returns:
-        An integer state corresponding to the discretized representation of cur_lon, cur_lat according to the
-        grid parameters passed in.
+        int: A state corresponding to the discretized representation of ``cur_lon``, ``cur_lat``.
     """
     # normalize lat and lon to the minimum values
     norm_lon = cur_lon - grid_params['min_lon']
     norm_lat = cur_lat - grid_params['min_lat']
+
     # find the row and column position based on grid_len
     col = norm_lon // grid_params['grid_len']
     row = norm_lat // grid_params['grid_len']
+
     # find total state based on num_cols in final grid
     return (row * grid_params['num_cols'] + col).astype(int)
 
@@ -359,13 +372,13 @@ def get_action(traj, options, grid_params):
     interpolated actions for all entries in the series.
 
     Args:
-        traj: A pandas DataFrame with all the states encountered in a trajectory with their respective coordinates.
-        options: The options specified by the user in ``config_file`` on how to run the script.
-        grid_params: Specifies the minimum and maximum latitudes and longitudes in the dataset.
+        traj (pandas.DataFrame): A pandas DataFrame with all the states encountered in a trajectory with their
+            respective coordinates.
+        options (dict): The script options specified in the ``config_file``.
+        grid_params (dict): The grid parameters specified in the ``config_file``.
 
     Returns:
-        A pandas Series of DataFrames with each DataFrame entry representing one interpolated state-action-state
-        triplet.
+        dict: The sequence of state-action-state triplets for the passed in trajectory.
     """
     # retrieves trajectory data
     traj_num = traj.name
@@ -414,7 +427,10 @@ def get_action(traj, options, grid_params):
         lon_out.append(lon.iloc[-1])
         lat_out.append(lat.iloc[-1])
 
+    # instantiates final dataframe-ready dictionary with state-action-state triplets
     data_out = {'ID': [traj_num] * len(acts_out), 'PREV': states_out[:-1], 'ACT': acts_out, 'CUR': states_out[1:]}
+
+    # adds coordinate fields for final output if specified in options
     if options['append_coords']:
         data_out['LON'] = lon_out
         data_out['LAT'] = lat_out
@@ -427,36 +443,36 @@ def get_action_arb(row, options, grid_params):
 
     First, the relative offset between the current and previous state in rows and columns is calculated.
     The action is then calculated according to a spiral rule beginning with the previous state, so self-transitions
-    are defined as 0 as an initial condition. Spiral inspired by the polar function r = theta.
+    are defined as ``0`` as an initial condition. Spiral inspired by the polar function ``r = theta``.
 
-    For example, if ``prev_state = 5``, ``cur_state = 7``, and ``num_cols = 4``, then our state grid is populated
-    as follows:
+    Example:
+        For example, if ``prev_state = 5``, ``cur_state = 7``, and ``num_cols = 4``, then our state grid is populated
+        as follows::
 
-    8  9 10 11
-    4  p  6  c
-    0  1  2  3
+            8  9 10 11
+            4  p  6  c
+            0  1  2  3
 
-    Where p represents the location of the previous state, and c represents the location of the current state.
-    Then the current state's position relative to the previous state is ``rel_row = 0``, ``rel_col = 2``. Our action
-    spiral then looks like this:
+        Where p represents the location of the previous state, and c represents the location of the current state.
+        Then the current state's position relative to the previous state is ``rel_row = 0``, ``rel_col = 2``. Our action
+        spiral then looks like this::
 
-    15 14 13 12 11      15 14 13 12 11
-    16  4  3  2 10      16  4  3  2 10
-    17  5  0  1  9  ->  17  5  p  1  c
-    18  6  7  8 24      18  6  7  8 24
-    19 20 21 22 23      19 20 21 22 23
+            15 14 13 12 11      15 14 13 12 11
+            16  4  3  2 10      16  4  3  2 10
+            17  5  0  1  9  ->  17  5  p  1  c
+            18  6  7  8 24      18  6  7  8 24
+            19 20 21 22 23      19 20 21 22 23
 
-    Thus, this algorithm will return 9 as the action.
+        Thus, this algorithm will return ``9`` as the action.
 
     Args:
-        row: a pandas Series representing one row of the DataFrame the function is applied to, containing the trajectory
-            number, previous state, current state, longitude, and latitude.
-        options: The options specified by the user in ``config_file`` on how to run the script.
-        grid_params: Specifies the minimum and maximum latitudes and longitudes in the dataset.
+        row (pandas.Series): One row of the DataFrame the function is applied to, containing the trajectory number,
+            previous state, current state, longitude, and latitude.
+        options (dict): The script options specified in the ``config_file``.
+        grid_params (dict): The grid parameters specified in the ``config_file``.
 
     Returns:
-        A pandas DataFrame of transitions that interpolate between ``prev_state`` and ``cur_state``. Optionally appends
-        the coordinate values of each ``prev_state`` as additional columns.
+        dict: State-action-state triplets that interpolate between ``prev_state`` and ``cur_state``.
     """
     # retrieves transition data
     traj_num = row['ID'].astype(int)
@@ -514,57 +530,64 @@ def get_action_interp_with_diag(row, options, grid_params):
     the states are not adjacent (including diagonals, resulting in 9 possible actions). This interpolation
     assumes a deterministic system.
 
-    For example, if ``prev_state = 5``, ``cur_state = 7``, and ``num_cols = 4``, then our state grid is populated
-    as follows:
+    Example:
+        For example, if ``prev_state = 5``, ``cur_state = 7``, and ``num_cols = 4``, then our state grid is populated
+        as follows::
 
-    8  9 10 11
-    4  p  6  c
-    0  1  2  3
+            8  9 10 11
+            4  p  6  c
+            0  1  2  3
 
-    output: ``pd.DataFrame({})``
+        Output snippet::
 
-    Where p represents the location of the previous state, and c represents the location of the current state.
-    Then the current state's position relative to the previous state is ``rel_row = 0``, ``rel_col = 2``. Our
-    action spiral then looks like this:
+            pd.DataFrame({})
 
-    4  3  2      4  3  2
-    5  0  1  ->  5  p  1  c
-    7  8  9      6  7  8
+        Where p represents the location of the previous state, and c represents the location of the current state.
+        Then the current state's position relative to the previous state is ``rel_row = 0``, ``rel_col = 2``. Our
+        action spiral then looks like this::
 
-    output: ``pd.DataFrame({
+            4  3  2      4  3  2
+            5  0  1  ->  5  p  1  c
+            7  8  9      6  7  8
+
+        Output snippet::
+
+            pd.DataFrame({
                             'ID': [traj_num, ],
                             'PREV': [prev_state, ],
                             'ACT': [1, ],
                             'CUR': [prev_state + 1, ]
-                            })``
+                        })
 
-    Because the current state is not adjacent (including diagonals), we interpolate by taking the action that
-    brings us closest to the current state: action 1, resulting in a new action spiral and a new previous state.
+        Because the current state is not adjacent (including diagonals), we interpolate by taking the action that
+        brings us closest to the current state: action ``1``, resulting in a new action spiral and a new previous
+        state::
 
-    4  3  2      4  3  2
-    5  0  1  ->  5  p  c
-    7  8  9      6  7  8
+            4  3  2      4  3  2
+            5  0  1  ->  5  p  c
+            7  8  9      6  7  8
 
-    output: ``pd.DataFrame({
+        Final output::
+
+            pd.DataFrame({
                             'ID': [traj_num] * 2,
                             'PREV': [prev_state, prev_state + 1],
                             'ACT': [1, 1],
                             'CUR': [prev_state + 1, cur_state]
-                            })``
+                        })
 
-    Now, our new previous state is adjacent to the current state, so we can take action 1, which updates our
-    previous state to exactly match the current state, so the algorithm terminates and returns the list of
-    state-action-state transitions.
+        Now, our new previous state is adjacent to the current state, so we can take action ``1``, which updates our
+        previous state to exactly match the current state, so the algorithm terminates and returns the list of
+        state-action-state transitions.
 
     Args:
-        row: a pandas Series representing one row of the DataFrame the function is applied to, containing the trajectory
-        number, previous state, current state, longitude, and latitude.
-        options: The options specified by the user in ``config_file`` on how to run the script.
-        grid_params: Specifies the minimum and maximum latitudes and longitudes in the dataset.
+        row (pandas.Series): One row of the DataFrame the function is applied to, containing the trajectory number,
+            previous state, current state, longitude, and latitude.
+        options (dict): The script options specified in the ``config_file``.
+        grid_params (dict): The grid parameters specified in the ``config_file``.
 
     Returns:
-        A pandas DataFrame of transitions that interpolate between ``prev_state`` and ``cur_state``. Optionally
-        appends the coordinate values of each ``prev_state`` as additional columns.
+        dict: State-action-state triplets that interpolate between ``prev_state`` and ``cur_state``.
     """
     # retrieves transition data
     traj_num = row['ID'].astype(int)
@@ -658,57 +681,63 @@ def get_action_interp_reg(row, options, grid_params):
     the states are not adjacent (only actions are right, left, up, down, and none). This interpolation
     assumes a deterministic system.
 
-    For example, if ``prev_state = 5``, ``cur_state = 7``, and ``num_cols = 4``, then our state grid is populated
-    as follows:
+    Example:
+        For example, if ``prev_state = 5``, ``cur_state = 7``, and ``num_cols = 4``, then our state grid is populated
+        as follows::
 
-    8  9 10 11
-    4  p  6  c
-    0  1  2  3
+            8  9 10 11
+            4  p  6  c
+            0  1  2  3
 
-    output: ``pd.DataFrame({})``
+        Output snippet::
 
-    Where p represents the location of the previous state, and c represents the location of the current state.
-    Then the current state's position relative to the previous state is ``rel_row = 0``, ``rel_col = 2``. Our action
-    spiral then looks like this:
+            pd.DataFrame({})
 
-       2            2
-    3  0  1  ->  3  p  1  c
-       4            4
+        Where p represents the location of the previous state, and c represents the location of the current state.
+        Then the current state's position relative to the previous state is ``rel_row = 0``, ``rel_col = 2``. Our action
+        spiral then looks like this::
 
-    output: ``pd.DataFrame({
-                            'ID': [traj_num, ],
-                            'PREV': [prev_state, ],
-                            'ACT': [1, ],
-                            'CUR': [prev_state + 1, ]
-                            })``
+               2            2
+            3  0  1  ->  3  p  1  c
+               4            4
 
-    Because the current state is not adjacent, we interpolate by taking the action that brings us closest to
-    the current state: action 1, resulting in a new action spiral and a new previous state.
+        Output snippet::
 
-       2            1
-    3  0  1  ->  2  p  c
-       4            4
+            output: pd.DataFrame({
+                                    'ID': [traj_num, ],
+                                    'PREV': [prev_state, ],
+                                    'ACT': [1, ],
+                                    'CUR': [prev_state + 1, ]
+                                })
 
-    output: ``pd.DataFrame({
+        Because the current state is not adjacent, we interpolate by taking the action that brings us closest to
+        the current state: action ``1``, resulting in a new action spiral and a new previous state::
+
+               2            1
+            3  0  1  ->  2  p  c
+               4            4
+
+        Final output::
+
+            pd.DataFrame({
                             'ID': [traj_num] * 2,
                             'PREV': [prev_state, prev_state + 1],
                             'ACT': [1, 1],
                             'CUR': [prev_state + 1, cur_state]
-                            })``
+                        })
 
-    Now, our new previous state is adjacent to the current state, so we can take action 1, which updates our
-    previous state to exactly match the current state, so the algorithm terminates and returns the list of
-    state-action-state transitions.
+        Now, our new previous state is adjacent to the current state, so we can take action ``1``, which updates our
+        previous state to exactly match the current state, so the algorithm terminates and returns the list of
+        state-action-state transitions.
 
     Args:
-        row: a pandas Series representing one row of the DataFrame the function is applied to, containing the
-        trajectory number, previous state, current state, longitude, and latitude.
-        options: The options specified by the user in ``config_file`` on how to run the script.
-        grid_params: Specifies the minimum and maximum latitudes and longitudes in the dataset.
+        row (pandas.Series): One row of the DataFrame the function is applied to, containing the trajectory number,
+            previous state, current state, longitude, and latitude.
+        options (dict): The script options specified in the ``config_file``.
+        grid_params (dict): The grid parameters specified in the ``config_file``.
 
     Returns:
-        A pandas DataFrame of transitions that interpolate between ``prev_state`` and ``cur_state``. Optionally
-        appends the coordinate values of each ``prev_state`` as additional columns.
+        dict: State-action-state triplets that interpolate between ``prev_state`` and ``cur_state``.
     """
     # retrieves transition data
     traj_num = row['ID'].astype(int)
@@ -795,21 +824,24 @@ def get_action_interp_reg(row, options, grid_params):
 def state_to_coord(state, options, grid_params):
     """Inverse function for ``get_state``.
 
-    Takes in a discretized state, the coordinate precision, and the grid parameters to calculate the coordinates of the
-    middle of the state in the grid.
+    Calculates the coordinates of the middle of the passed in state in the specified grid passed in.
 
     Args:
-        state: The discretized grid square returned by ``get_state``.
-        options: The options specified by the user in ``config_file`` on how to run the script.
-        grid_params: Specifies the minimum and maximum latitudes and longitudes in the dataset.
+        state (int): The discretized grid square returned by ``get_state``.
+        options (dict): The script options specified in the ``config_file``.
+        grid_params (dict): The grid parameters specified in the ``config_file``.
 
     Returns:
-        The longitude and latitude representing the middle of the state passed in.
+        tuple: The longitude and latitude representing the middle of the state passed in.
     """
+    # calculates the integer state's row and column representation in the grid
     state_col = state % grid_params['num_cols']
     state_row = state // grid_params['num_cols']
+
+    # calculates the latitude and longitude corresponding to the middle of the grid square
     state_lon = round(grid_params['min_lon'] + grid_params['grid_len'] * (state_col + 0.5), options['prec_coords'])
     state_lat = round(grid_params['min_lat'] + grid_params['grid_len'] * (state_row + 0.5), options['prec_coords'])
+
     return state_lon, state_lat
 
 

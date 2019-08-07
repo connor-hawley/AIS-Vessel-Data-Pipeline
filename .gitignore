@@ -3,7 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-/AIS_ASCII_by_UTM_Month/*
+AIS_ASCII_by_UTM_Month/*
 *.csv
 
 .DS_Store
@@ -12,3 +12,7 @@ __pycache__/
 .ipynb_checkpoints
 
 meta_data.yaml
+
+# Documentation builds
+docs/build/*
+docs/source/api/*
