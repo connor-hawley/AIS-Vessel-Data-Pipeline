@@ -6,8 +6,6 @@ Uses information specified in the ``config_file`` to chew through available AIS 
 with the discretized states, inferred actions, and records metadata for further processing in the ``meta_file``.
 """
 import yaml
-
-
 import os
 import math
 import numpy as np
@@ -42,7 +40,9 @@ def main():
     grid_params = config["grid_params"]
 
     # gets the csv files available and their metadata
-    csv_files, all_files_meta = collect_csv_files(options, directories, meta_params)
+    csv_files, all_files_meta = collect_csv_files(
+        options, directories, meta_params
+    )
 
     # reads the collected csv files and assembles trajectories
     trajectories, grid_params = read_data(csv_files, options, grid_params)
@@ -115,10 +115,18 @@ def collect_csv_files(options, directories, meta_params):
                 # only considers valid years and months if time is bounded and valid zones if zones are bounded
                 if (
                     not options["bound_time"]
-                    or (meta_params["min_year"] <= year <= meta_params["max_year"])
+                    or (
+                        meta_params["min_year"]
+                        <= year
+                        <= meta_params["max_year"]
+                    )
                 ) and (
                     not options["bound_zone"]
-                    or (meta_params["min_zone"] <= zone <= meta_params["max_zone"])
+                    or (
+                        meta_params["min_zone"]
+                        <= zone
+                        <= meta_params["max_zone"]
+                    )
                 ):
                     if (
                         not options["bound_time"]
@@ -137,7 +145,11 @@ def collect_csv_files(options, directories, meta_params):
                         csv_files.append(os.path.join(root, file))
 
                         # create dictionary to describe file characteristics
-                        file_meta = {"year": year, "month": month, "zone": zone}
+                        file_meta = {
+                            "year": year,
+                            "month": month,
+                            "zone": zone,
+                        }
                         all_files_meta[file] = file_meta
 
     return csv_files, all_files_meta
@@ -202,13 +214,25 @@ def read_data(csv_files, options, grid_params):
             ]
 
         # infers grid boundaries if no boundaries are specified
-        if not options["bound_lon"] and ais_df["LON"].min() < grid_params["min_lon"]:
+        if (
+            not options["bound_lon"]
+            and ais_df["LON"].min() < grid_params["min_lon"]
+        ):
             grid_params["min_lon"] = ais_df["LON"].min()
-        if not options["bound_lon"] and ais_df["LON"].max() > grid_params["max_lon"]:
+        if (
+            not options["bound_lon"]
+            and ais_df["LON"].max() > grid_params["max_lon"]
+        ):
             grid_params["max_lon"] = ais_df["LON"].max()
-        if not options["bound_lat"] and ais_df["LAT"].min() < grid_params["min_lat"]:
+        if (
+            not options["bound_lat"]
+            and ais_df["LAT"].min() < grid_params["min_lat"]
+        ):
             grid_params["min_lat"] = ais_df["LAT"].min()
-        if not options["bound_lat"] and ais_df["LAT"].max() > grid_params["max_lat"]:
+        if (
+            not options["bound_lat"]
+            and ais_df["LAT"].max() > grid_params["max_lat"]
+        ):
             grid_params["max_lat"] = ais_df["LAT"].max()
 
         # appends current dataframe to list of all dataframes
@@ -227,7 +251,8 @@ def read_data(csv_files, options, grid_params):
 
     # number of columns in the resulting grid
     grid_params["num_cols"] = math.ceil(
-        (grid_params["max_lon"] - grid_params["min_lon"]) / grid_params["grid_len"]
+        (grid_params["max_lon"] - grid_params["min_lon"])
+        / grid_params["grid_len"]
     )
 
     return trajectories, grid_params
@@ -274,11 +299,15 @@ def write_data(trajectories, options, directories, grid_params):
 
     # drops the trajectories with fewer states than ``options['min_states']``
     traj_lengths = trajectories["MMSI"].value_counts()
-    traj_keep = traj_lengths[traj_lengths > options["min_states"] - 1].index.values
+    traj_keep = traj_lengths[
+        traj_lengths > options["min_states"] - 1
+    ].index.values
     trajectories = trajectories.loc[trajectories["MMSI"].isin(traj_keep)]
 
     # aliases the MMSI column to ascending integers to enumerate trajectories and make easier to read
-    alias = {mmsi: ind for ind, mmsi in enumerate(trajectories["MMSI"].unique())}
+    alias = {
+        mmsi: ind for ind, mmsi in enumerate(trajectories["MMSI"].unique())
+    }
     trajectories["MMSI"] = trajectories["MMSI"].map(alias)
 
     # resets index now that manipulation of this dataframe has finished
@@ -322,7 +351,9 @@ def write_data(trajectories, options, directories, grid_params):
 
     # writes new dataframe to final csv
     sas = pd.DataFrame(sas_data)
-    sas.to_csv(directories["out_dir_path"] + directories["out_dir_file"], index=False)
+    sas.to_csv(
+        directories["out_dir_path"] + directories["out_dir_file"], index=False
+    )
 
 
 def get_bounds(zone):
@@ -362,13 +393,17 @@ def get_meta_data(file_name):
         "_"
     )  # splits csv file on '_' character, which separates relevant file info
     year = int(meta_file_data[-3])  # third to last element of file is the year
-    month = int(meta_file_data[-2])  # second to last element of file is the month
+    month = int(
+        meta_file_data[-2]
+    )  # second to last element of file is the month
 
     # get zone number for csv file being read
     ending_raw = meta_file_data[
         -1
     ]  # gets last part of the file, with format "ZoneXX.csv"
-    ending_data = ending_raw.split(".")  # splits last part of file on '.' character
+    ending_data = ending_raw.split(
+        "."
+    )  # splits last part of file on '.' character
     zone_raw = ending_data[0]  # gets "ZoneXX" string
     zone_data = zone_raw[
         -2:
@@ -468,11 +503,13 @@ def get_action(traj, options, grid_params):
     else:
         if options["allow_diag"]:
             traj_df = traj_df.apply(
-                lambda x: get_action_interp_with_diag(x, options, grid_params), axis=1
+                lambda x: get_action_interp_with_diag(x, options, grid_params),
+                axis=1,
             )
         else:
             traj_df = traj_df.apply(
-                lambda x: get_action_interp_reg(x, options, grid_params), axis=1
+                lambda x: get_action_interp_reg(x, options, grid_params),
+                axis=1,
             )
 
     # merges the dictionary series
@@ -571,15 +608,23 @@ def get_action_arb(row, options, grid_params):
             i += 1  # move to next spiral
             x = i
             layer = (2 * i + 1) ** 2  # calculate breakpoint for next spiral
-        elif x == i and y < i:  # traverses from beginning of layer to top right corner
+        elif (
+            x == i and y < i
+        ):  # traverses from beginning of layer to top right corner
             y += 1
         elif x > -i and y == i:  # traverses from top right to top left corner
             x -= 1
-        elif x == -i and y > -i:  # traverses from top left to bottom left corner
+        elif (
+            x == -i and y > -i
+        ):  # traverses from top left to bottom left corner
             y -= 1
-        elif x < i and y == -i:  # traverses from bottom left to bottom right corner
+        elif (
+            x < i and y == -i
+        ):  # traverses from bottom left to bottom right corner
             x += 1
-        elif x == i and y < 0:  # traverses from bottom left corner to end of layer
+        elif (
+            x == i and y < 0
+        ):  # traverses from bottom left corner to end of layer
             y += 1
         action_num += 1
 
@@ -738,7 +783,12 @@ def get_action_interp_with_diag(row, options, grid_params):
         prev_col = temp_col
 
     # prepares final data dictionary to build DataFrame
-    out_data = {"ID": [traj_num] * len(prevs), "PREV": prevs, "ACT": acts, "CUR": curs}
+    out_data = {
+        "ID": [traj_num] * len(prevs),
+        "PREV": prevs,
+        "ACT": acts,
+        "CUR": curs,
+    }
 
     # overwrites the coordinates of the first state in interpolated transitions to be original raw values
     if options["append_coords"]:
@@ -887,7 +937,12 @@ def get_action_interp_reg(row, options, grid_params):
         prev_col = temp_col
 
     # prepares final data dictionary to build DataFrame
-    out_data = {"ID": [traj_num] * len(acts), "PREV": prevs, "ACT": acts, "CUR": curs}
+    out_data = {
+        "ID": [traj_num] * len(acts),
+        "PREV": prevs,
+        "ACT": acts,
+        "CUR": curs,
+    }
 
     # overwrites the coordinates of the first state in interpolated transitions to be original raw values
     if options["append_coords"]:
