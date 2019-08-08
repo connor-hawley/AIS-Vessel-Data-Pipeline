@@ -27,10 +27,10 @@ def main():
     year, month, and zone of all the files read in.
     """
     # file containing important options, directories, parameters, etc.
-    config_file = "config.yaml"
+    config_file = "config.yml"
 
     # file to write final grid_params and the csv files' respective years, months, and zones
-    meta_file = "meta_data.yaml"
+    meta_file = "meta_data.yml"
 
     # gets the config dictionary and unpacks it
     config = get_config(config_file)

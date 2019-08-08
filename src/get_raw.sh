@@ -10,7 +10,7 @@ DELETE_ZIPPED=true
 # specify whether or not to clear files already extracted before downloading new ones
 CLEAR_BEFORE_DOWNLOAD=false
 # specify the output path for the files to be downloaded
-OUTPUT_DIR="./"
+OUTPUT_DIR="../data/"
 
 SITE="https://coast.noaa.gov/htdata/CMSP/AISDataHandler/"
 # NOTE: all begin/end values are inclusive

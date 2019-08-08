@@ -3,9 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# repo outputs
-AIS_ASCII_by_UTM_Month/*
-*.csv
+# repo data and output
+data/*
+!data/.gitkeep
 
 # mac
 .DS_Store
@@ -14,8 +14,8 @@ AIS_ASCII_by_UTM_Month/*
 .idea
 
 # side effects of running script
-.ipynb_checkpoints
-meta_data.yaml
+*.ipynb_checkpoints
+src/meta_data.yml
 
 # documentation builds
 docs/build/*

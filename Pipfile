@@ -22,6 +22,7 @@ black = "*"
 pre-commit = "*"
 flake8 = "*"
 pylint = "*"
+pytest = "*"
 
 [requires]
 python_version = "3.7"

@@ -1,4 +1,7 @@
 language: bash
+python:
+    - 3.6
+    - 3.7
 
 script:
 - ./get_raw.sh test 2015 1 1

@@ -14,9 +14,9 @@ options:
     min_states     : 2        # set minimum number of states in a trajectory necessary to qualify it for the output file
 
 directories:
-    in_dir_path  : ./  # specifies the directory where input data is located
+    in_dir_path  : ../data/  # specifies the directory where input data is located
     in_dir_data  : AIS_ASCII_by_UTM_Month/  # specifies the folder name containing all the data in the input directory
-    out_dir_path : ./  # specifies the directory where output data files should be written
+    out_dir_path : ../data/  # specifies the directory where output data files should be written
     out_dir_file : ais_data_output.csv  # specifies output file name (should be .csv)
 
 # specifies the metadata bounds (inclusive) for what data to consider
@@ -33,7 +33,7 @@ meta_params:
     # the range of zones (inclusive) that will be considered
     # zone description: 1 - 9 -> Alaska, 4 - 5 -> Hawaii, 9 - 20 -> continental US
     # data are available for zones 1 - 20, but see ``get_raw.sh`` for more information
-    min_zone  : 15
+    min_zone  : 1
     max_zone  : 20
 
 # this will track the minimum and maximum latitudes and longitudes in the dataset if bound_lat and bound_lon are False
