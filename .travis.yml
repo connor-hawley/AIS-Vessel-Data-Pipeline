@@ -1,4 +1,11 @@
 language: bash
 
 script:
-- echo "hello world"
+- ./get_raw.sh test 2015 1 1
+- rm -rf test
+- ./get_raw.sh 2015 1 1
+
+notifications:
+  email:
+    on_success: never
+    on_failure: never

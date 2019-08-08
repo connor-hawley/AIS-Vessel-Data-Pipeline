@@ -75,11 +75,11 @@ fi
 if [[ ! -z "$1" && ! -z "$2" && ! -z "$3" && ! -z "$4" ]]; then # command line argument used: $2 is year, $3 is month, and $4 is zone
     echo "getting AIS data for ${3}/${2}, zone ${4}"
     file=$(get_file "$2" "$3" "$4")
-    wget "${SITE}${file}"
+    wget -N "${SITE}${file}"
 elif [[ ! -z "$1" && ! -z "$2" && ! -z "$3" ]]; then # command line argument used: $1 is year, $2 is month, and $3 is zone
     echo "getting AIS data for ${2}/${1}, zone ${3}"
     file=$(get_file "$1" "$2" "$3")
-    wget "${SITE}${file}"
+    wget -N "${SITE}${file}"
 else # command line argument for year month zone is empty: use ranges defined above
     if [[ -z "$2" ]]; then
         # iterate through selected years, months, and zones
@@ -91,7 +91,7 @@ else # command line argument for year month zone is empty: use ranges defined ab
                     if [[ ( ! ${year} -eq ${YEAR_BEGIN} || ${month} -ge ${MONTH_BEGIN} ) && \
                        ( ! ${year} -eq ${YEAR_END} || ${month} -le ${MONTH_END} ) ]]; then
                         file=$(get_file "$year" "$month" "$zone")
-                        wget "${SITE}${file}"
+                        wget -N "${SITE}${file}"
                     fi
                 done
             done
@@ -101,14 +101,16 @@ else # command line argument for year month zone is empty: use ranges defined ab
         echo "usage option 2: './get_raw.sh year month zone' for specified year, month, and zone. set path in file"
         echo "usage option 3: './get_raw.sh path' for specified path. set year, month, and zone ranges in file"
         echo "usage option 4: './get_raw.sh' set path, year, month, and zone ranges in file"
-
+        exit 1
     fi
 fi
 
 # unzip the collected files and then delete the .zip files remaining
 for zipped in *.zip; do
-    unzip -o "$zipped" -d ./
+    unzip -n "$zipped" -d ./
     if [[ "$DELETE_ZIPPED" = true ]]; then
         rm "$zipped"
     fi
 done
+
+exit 0
