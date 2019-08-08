@@ -1,5 +1,8 @@
+[![Build Status](https://travis-ci.com/connor-hawley/AIS-Vessel-Data-Pipeline.svg?branch=master)](https://travis-ci.com/connor-hawley/AIS-Vessel-Data-Pipeline)
 [![Documentation Status](https://readthedocs.org/projects/ais-vessel-data-pipeline/badge/?version=latest)](https://ais-vessel-data-pipeline.readthedocs.io/en/latest/?badge=latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
 # AIS-Vessel-Data
 Preprocessing data based on https://marinecadastre.gov/ais/
 

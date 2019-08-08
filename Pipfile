@@ -21,6 +21,7 @@ sphinx-automodapi = "*"
 black = "*"
 pre-commit = "*"
 flake8 = "*"
+pylint = "*"
 
 [requires]
 python_version = "3.7"
