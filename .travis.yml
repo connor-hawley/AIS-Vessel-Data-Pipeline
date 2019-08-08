@@ -4,8 +4,9 @@ python:
     - 3.7
 
 script:
-- ./get_raw.sh test 2015 1 1
-- rm -rf test
+- cd src/
+- ./get_raw.sh test_shell 2015 1 1
+- rm -rf test_shell
 - ./get_raw.sh 2015 1 1
 
 notifications:
