@@ -1,1 +1,4 @@
-language: python
+language: bash
+
+script:
+- echo "hello world"
