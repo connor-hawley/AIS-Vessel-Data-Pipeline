@@ -1,3 +1,4 @@
+[![Documentation Status](https://readthedocs.org/projects/ais-vessel-data-pipeline/badge/?version=latest)](https://ais-vessel-data-pipeline.readthedocs.io/en/latest/?badge=latest)
 # AIS-Vessel-Data
 Preprocessing data based on https://marinecadastre.gov/ais/
 
