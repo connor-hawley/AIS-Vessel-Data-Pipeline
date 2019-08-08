@@ -27,17 +27,17 @@ def main():
     year, month, and zone of all the files read in.
     """
     # file containing important options, directories, parameters, etc.
-    config_file = 'config.yaml'
+    config_file = "config.yaml"
 
     # file to write final grid_params and the csv files' respective years, months, and zones
-    meta_file = 'meta_data.yaml'
+    meta_file = "meta_data.yaml"
 
     # gets the config dictionary and unpacks it
     config = get_config(config_file)
-    options = config['options']
-    directories = config['directories']
-    meta_params = config['meta_params']
-    grid_params = config['grid_params']
+    options = config["options"]
+    directories = config["directories"]
+    meta_params = config["meta_params"]
+    grid_params = config["grid_params"]
 
     # gets the csv files available and their metadata
     csv_files, all_files_meta = collect_csv_files(options, directories, meta_params)
@@ -49,14 +49,17 @@ def main():
     write_data(trajectories, options, directories, grid_params)
 
     # writes file metadata, paths, and grid parameters to ``meta_file``
-    directories_out = {'in_dir_path': directories['out_dir_path'], 'in_dir_data': directories['out_dir_file']}
-    out_dict = {
-        'all_files_meta': all_files_meta,
-        'options': options,
-        'directories': directories_out,
-        'grid_params': grid_params
+    directories_out = {
+        "in_dir_path": directories["out_dir_path"],
+        "in_dir_data": directories["out_dir_file"],
     }
-    with open(meta_file, 'w') as outfile:
+    out_dict = {
+        "all_files_meta": all_files_meta,
+        "options": options,
+        "directories": directories_out,
+        "grid_params": grid_params,
+    }
+    with open(meta_file, "w") as outfile:
         yaml.dump(out_dict, outfile, default_flow_style=False)
 
 
@@ -73,7 +76,7 @@ def get_config(config_file):
     Returns:
         dict: The script configuration parameters.
     """
-    with open(config_file, 'r') as stream:
+    with open(config_file, "r") as stream:
         try:
             return yaml.safe_load(stream)
         except yaml.YAMLError as exc:
@@ -98,21 +101,41 @@ def collect_csv_files(options, directories, meta_params):
     # initialize a list that will be filled with all csv file names from root
     csv_files = []
     all_files_meta = {}
-    for root, dirs, files in os.walk(directories['in_dir_path'] + directories['in_dir_data']):
+    for root, dirs, files in os.walk(
+        directories["in_dir_path"] + directories["in_dir_data"]
+    ):
         for file in files:
             if file.endswith(".csv"):
-                year, month, zone = get_meta_data(file)  # finds the data year, month, and zone based on the file name
+                year, month, zone = get_meta_data(
+                    file
+                )  # finds the data year, month, and zone based on the file name
 
                 # only considers valid years and months if time is bounded and valid zones if zones are bounded
-                if (not options['bound_time'] or (meta_params['min_year'] <= year <= meta_params['max_year'])) and \
-                   (not options['bound_zone'] or (meta_params['min_zone'] <= zone <= meta_params['max_zone'])):
-                    if (not options['bound_time'] or (not year == meta_params['min_year'] or month >= meta_params['min_month'])) and \
-                       (not options['bound_time'] or (not year == meta_params['max_year'] or month <= meta_params['max_month'])):
+                if (
+                    not options["bound_time"]
+                    or (meta_params["min_year"] <= year <= meta_params["max_year"])
+                ) and (
+                    not options["bound_zone"]
+                    or (meta_params["min_zone"] <= zone <= meta_params["max_zone"])
+                ):
+                    if (
+                        not options["bound_time"]
+                        or (
+                            not year == meta_params["min_year"]
+                            or month >= meta_params["min_month"]
+                        )
+                    ) and (
+                        not options["bound_time"]
+                        or (
+                            not year == meta_params["max_year"]
+                            or month <= meta_params["max_month"]
+                        )
+                    ):
                         # csv_files will contain file locations relative to current directory
                         csv_files.append(os.path.join(root, file))
 
                         # create dictionary to describe file characteristics
-                        file_meta = {'year': year, 'month': month, 'zone': zone}
+                        file_meta = {"year": year, "month": month, "zone": zone}
                         all_files_meta[file] = file_meta
 
     return csv_files, all_files_meta
@@ -140,12 +163,12 @@ def read_data(csv_files, options, grid_params):
         dictionary that specifies the minimum and maximum latitudes and longitudes in the dataset.
     """
     # overwrite hard boundaries on longitude and latitude if not bounded in config.yaml
-    if not options['bound_lon']:
-        grid_params['min_lon'] = 180
-        grid_params['max_lon'] = -180
-    if not options['bound_lat']:
-        grid_params['min_lat'] = 90
-        grid_params['max_lat'] = -90
+    if not options["bound_lon"]:
+        grid_params["min_lon"] = 180
+        grid_params["max_lon"] = -180
+    if not options["bound_lat"]:
+        grid_params["min_lat"] = 90
+        grid_params["max_lat"] = -90
 
     # holds all ais data, one dataframe per csv file
     ais_data = []
@@ -153,30 +176,38 @@ def read_data(csv_files, options, grid_params):
     # get data from all csv files
     for csv_file in csv_files:
         # reads in the raw data with columns and number of rows specified in config.yaml
-        nrows = options['max_rows'] if options['limit_rows'] else None
-        usecols = ['MMSI', 'LON', 'LAT', 'BaseDateTime']
+        nrows = options["max_rows"] if options["limit_rows"] else None
+        usecols = ["MMSI", "LON", "LAT", "BaseDateTime"]
         ais_df = pd.read_csv(csv_file, usecols=usecols, nrows=nrows)
         ais_df = ais_df[usecols]
 
         # interprets raw time entries as datetime objects and drops original column
-        ais_df['TIME'] = pd.to_datetime(ais_df['BaseDateTime'], format="%Y-%m-%dT%H:%M:%S")
-        ais_df.drop(columns='BaseDateTime', inplace=True)
+        ais_df["TIME"] = pd.to_datetime(
+            ais_df["BaseDateTime"], format="%Y-%m-%dT%H:%M:%S"
+        )
+        ais_df.drop(columns="BaseDateTime", inplace=True)
 
         # keeps only rows in boundaries if specified
-        if options['bound_lon']:
-            ais_df = ais_df.loc[(ais_df['LON'] >= grid_params['min_lon']) & (ais_df['LON'] <= grid_params['max_lon'])]
-        if options['bound_lat']:
-            ais_df = ais_df.loc[(ais_df['LAT'] >= grid_params['min_lat']) & (ais_df['LAT'] <= grid_params['max_lat'])]
+        if options["bound_lon"]:
+            ais_df = ais_df.loc[
+                (ais_df["LON"] >= grid_params["min_lon"])
+                & (ais_df["LON"] <= grid_params["max_lon"])
+            ]
+        if options["bound_lat"]:
+            ais_df = ais_df.loc[
+                (ais_df["LAT"] >= grid_params["min_lat"])
+                & (ais_df["LAT"] <= grid_params["max_lat"])
+            ]
 
         # infers grid boundaries if no boundaries are specified
-        if not options['bound_lon'] and ais_df['LON'].min() < grid_params['min_lon']:
-            grid_params['min_lon'] = ais_df['LON'].min()
-        if not options['bound_lon'] and ais_df['LON'].max() > grid_params['max_lon']:
-            grid_params['max_lon'] = ais_df['LON'].max()
-        if not options['bound_lat'] and ais_df['LAT'].min() < grid_params['min_lat']:
-            grid_params['min_lat'] = ais_df['LAT'].min()
-        if not options['bound_lat'] and ais_df['LAT'].max() > grid_params['max_lat']:
-            grid_params['max_lat'] = ais_df['LAT'].max()
+        if not options["bound_lon"] and ais_df["LON"].min() < grid_params["min_lon"]:
+            grid_params["min_lon"] = ais_df["LON"].min()
+        if not options["bound_lon"] and ais_df["LON"].max() > grid_params["max_lon"]:
+            grid_params["max_lon"] = ais_df["LON"].max()
+        if not options["bound_lat"] and ais_df["LAT"].min() < grid_params["min_lat"]:
+            grid_params["min_lat"] = ais_df["LAT"].min()
+        if not options["bound_lat"] and ais_df["LAT"].max() > grid_params["max_lat"]:
+            grid_params["max_lat"] = ais_df["LAT"].max()
 
         # appends current dataframe to list of all dataframes
         ais_data.append(ais_df)
@@ -185,15 +216,17 @@ def read_data(csv_files, options, grid_params):
     trajectories = pd.concat(ais_data, axis=0, ignore_index=True)
 
     # rounds inferred grid boundaries to nearest degree to provide some padding to each boundary
-    if not options['bound_lon']:
-        grid_params['min_lon'] = float(math.floor(grid_params['min_lon']))
-        grid_params['max_lon'] = float(math.ceil(grid_params['max_lon']))
-    if not options['bound_lat']:
-        grid_params['min_lat'] = float(math.floor(grid_params['min_lat']))
-        grid_params['max_lat'] = float(math.ceil(grid_params['max_lat']))
+    if not options["bound_lon"]:
+        grid_params["min_lon"] = float(math.floor(grid_params["min_lon"]))
+        grid_params["max_lon"] = float(math.ceil(grid_params["max_lon"]))
+    if not options["bound_lat"]:
+        grid_params["min_lat"] = float(math.floor(grid_params["min_lat"]))
+        grid_params["max_lat"] = float(math.ceil(grid_params["max_lat"]))
 
     # number of columns in the resulting grid
-    grid_params['num_cols'] = math.ceil((grid_params['max_lon'] - grid_params['min_lon']) / grid_params['grid_len'])
+    grid_params["num_cols"] = math.ceil(
+        (grid_params["max_lon"] - grid_params["min_lon"]) / grid_params["grid_len"]
+    )
 
     return trajectories, grid_params
 
@@ -217,35 +250,45 @@ def write_data(trajectories, options, directories, grid_params):
         grid_params (dict): The grid parameters specified in the ``config_file``.
     """
     # sorts based on MMSI, then sorts by timestamps within MMSI groups, drops the time column
-    trajectories.sort_values(['MMSI', 'TIME'], inplace=True)
-    trajectories.drop(columns='TIME', inplace=True)
+    trajectories.sort_values(["MMSI", "TIME"], inplace=True)
+    trajectories.drop(columns="TIME", inplace=True)
 
     # creates a new column of discretized states based on coordinate pairs
-    trajectories['STATE'] = get_state(trajectories['LON'].values, trajectories['LAT'].values, grid_params)
+    trajectories["STATE"] = get_state(
+        trajectories["LON"].values, trajectories["LAT"].values, grid_params
+    )
 
     # looks at state differences within MMSI trajectories and only keeps the states with nonzero differences
     # trajectories with only one state are kept because they will have a first row with 'nan' for diff
-    non_self_transitions = trajectories['STATE'].groupby(trajectories['MMSI']).diff().ne(0)
+    non_self_transitions = (
+        trajectories["STATE"].groupby(trajectories["MMSI"]).diff().ne(0)
+    )
     trajectories = trajectories.loc[non_self_transitions]
 
     # rounds latitude and longitude to specified precision
-    trajectories = trajectories.round({'LON': options['prec_coords'], 'LAT': options['prec_coords']})
+    trajectories = trajectories.round(
+        {"LON": options["prec_coords"], "LAT": options["prec_coords"]}
+    )
 
     # drops the trajectories with fewer states than ``options['min_states']``
-    traj_lengths = trajectories['MMSI'].value_counts()
-    traj_keep = traj_lengths[traj_lengths > options['min_states'] - 1].index.values
-    trajectories = trajectories.loc[trajectories['MMSI'].isin(traj_keep)]
+    traj_lengths = trajectories["MMSI"].value_counts()
+    traj_keep = traj_lengths[traj_lengths > options["min_states"] - 1].index.values
+    trajectories = trajectories.loc[trajectories["MMSI"].isin(traj_keep)]
 
     # aliases the MMSI column to ascending integers to enumerate trajectories and make easier to read
-    alias = {mmsi: ind for ind, mmsi in enumerate(trajectories['MMSI'].unique())}
-    trajectories['MMSI'] = trajectories['MMSI'].map(alias)
+    alias = {mmsi: ind for ind, mmsi in enumerate(trajectories["MMSI"].unique())}
+    trajectories["MMSI"] = trajectories["MMSI"].map(alias)
 
     # resets index now that manipulation of this dataframe has finished
     trajectories.reset_index(drop=True, inplace=True)
 
     # creates a series of stacked dataframes, each dataframe representing an interpolated state transition
-    sas = trajectories.groupby('MMSI').apply(lambda x: get_action(x, options, grid_params))
-    if isinstance(sas, pd.DataFrame):  # becomes a DataFrame when every trajectory has only one sas triplet
+    sas = trajectories.groupby("MMSI").apply(
+        lambda x: get_action(x, options, grid_params)
+    )
+    if isinstance(
+        sas, pd.DataFrame
+    ):  # becomes a DataFrame when every trajectory has only one sas triplet
         sas = sas[0]
 
     # merge Series of dictionaries
@@ -256,23 +299,28 @@ def write_data(trajectories, options, directories, grid_params):
     lons = []
     lats = []
     for traj in sas:
-        ids += traj['ID']
-        prevs += traj['PREV']
-        acts += traj['ACT']
-        curs += traj['CUR']
-        if options['append_coords']:
-            lons += traj['LON']
-            lats += traj['LAT']
+        ids += traj["ID"]
+        prevs += traj["PREV"]
+        acts += traj["ACT"]
+        curs += traj["CUR"]
+        if options["append_coords"]:
+            lons += traj["LON"]
+            lats += traj["LAT"]
 
     # prepare final dictionary with built lists and proper heading name
-    sas_data = {'sequence_id': ids, 'from_state_id': prevs, 'action_id': acts, 'to_state_id': curs}
-    if options['append_coords']:
-        sas_data['lon'] = lons
-        sas_data['lat'] = lats
+    sas_data = {
+        "sequence_id": ids,
+        "from_state_id": prevs,
+        "action_id": acts,
+        "to_state_id": curs,
+    }
+    if options["append_coords"]:
+        sas_data["lon"] = lons
+        sas_data["lat"] = lats
 
     # writes new dataframe to final csv
     sas = pd.DataFrame(sas_data)
-    sas.to_csv(directories['out_dir_path'] + directories['out_dir_file'], index=False)
+    sas.to_csv(directories["out_dir_path"] + directories["out_dir_file"], index=False)
 
 
 def get_bounds(zone):
@@ -289,9 +337,11 @@ def get_bounds(zone):
     Returns:
         tuple: The minimum and maximum longitudes of the zone passed in.
     """
-    min_lon = (6. * ((zone - 1) % 60)) - 180.  # counts 6 degrees per zone, offset by -180
+    min_lon = (
+        6.0 * ((zone - 1) % 60)
+    ) - 180.0  # counts 6 degrees per zone, offset by -180
 
-    return min_lon, (min_lon + 6.)
+    return min_lon, (min_lon + 6.0)
 
 
 def get_meta_data(file_name):
@@ -306,15 +356,21 @@ def get_meta_data(file_name):
     Returns:
         tuple: The year, month, and zone corresponding to the filename passed in.
     """
-    meta_file_data = file_name.split('_')  # splits csv file on '_' character, which separates relevant file info
+    meta_file_data = file_name.split(
+        "_"
+    )  # splits csv file on '_' character, which separates relevant file info
     year = int(meta_file_data[-3])  # third to last element of file is the year
     month = int(meta_file_data[-2])  # second to last element of file is the month
 
     # get zone number for csv file being read
-    ending_raw = meta_file_data[-1]  # gets last part of the file, with format "ZoneXX.csv"
-    ending_data = ending_raw.split('.')  # splits last part of file on '.' character
+    ending_raw = meta_file_data[
+        -1
+    ]  # gets last part of the file, with format "ZoneXX.csv"
+    ending_data = ending_raw.split(".")  # splits last part of file on '.' character
     zone_raw = ending_data[0]  # gets "ZoneXX" string
-    zone_data = zone_raw[-2:]  # gets last 2 characters of "ZoneXX" string - will be the zone number
+    zone_data = zone_raw[
+        -2:
+    ]  # gets last 2 characters of "ZoneXX" string - will be the zone number
     zone = int(zone_data)
 
     return year, month, zone
@@ -354,15 +410,15 @@ def get_state(cur_lon, cur_lat, grid_params):
         int: A state corresponding to the discretized representation of ``cur_lon``, ``cur_lat``.
     """
     # normalize lat and lon to the minimum values
-    norm_lon = cur_lon - grid_params['min_lon']
-    norm_lat = cur_lat - grid_params['min_lat']
+    norm_lon = cur_lon - grid_params["min_lon"]
+    norm_lat = cur_lat - grid_params["min_lat"]
 
     # find the row and column position based on grid_len
-    col = norm_lon // grid_params['grid_len']
-    row = norm_lat // grid_params['grid_len']
+    col = norm_lon // grid_params["grid_len"]
+    row = norm_lat // grid_params["grid_len"]
 
     # find total state based on num_cols in final grid
-    return (row * grid_params['num_cols'] + col).astype(int)
+    return (row * grid_params["num_cols"] + col).astype(int)
 
 
 def get_action(traj, options, grid_params):
@@ -382,30 +438,40 @@ def get_action(traj, options, grid_params):
     """
     # retrieves trajectory data
     traj_num = traj.name
-    states = traj['STATE']
+    states = traj["STATE"]
     last_state = states.iloc[-1]
-    lon = traj['LON']
-    lat = traj['LAT']
+    lon = traj["LON"]
+    lat = traj["LAT"]
 
     # prepares a dictionary of state transitions to be fed row-by-row as a DataFrame to the interpolation functions
-    data = {'ID': [traj_num] * (len(states) - 1), 'PREV': states.iloc[:-1].values, 'CUR': states.iloc[1:].values}
+    data = {
+        "ID": [traj_num] * (len(states) - 1),
+        "PREV": states.iloc[:-1].values,
+        "CUR": states.iloc[1:].values,
+    }
 
     # if specified, appends the original entry coordinates (not discretized) for each 'PREV' entry
-    if options['append_coords']:
-        data['LON'] = lon.iloc[:-1].values
-        data['LAT'] = lat.iloc[:-1].values
+    if options["append_coords"]:
+        data["LON"] = lon.iloc[:-1].values
+        data["LAT"] = lat.iloc[:-1].values
 
     # formats the final data dictionary as a DataFrame
     traj_df = pd.DataFrame(data)
 
     # selects specified interpolation function and applies it row-wise to ``traj_df``
-    if not options['interp_actions']:
-        traj_df = traj_df.apply(lambda x: get_action_arb(x, options, grid_params), axis=1)
+    if not options["interp_actions"]:
+        traj_df = traj_df.apply(
+            lambda x: get_action_arb(x, options, grid_params), axis=1
+        )
     else:
-        if options['allow_diag']:
-            traj_df = traj_df.apply(lambda x: get_action_interp_with_diag(x, options, grid_params), axis=1)
+        if options["allow_diag"]:
+            traj_df = traj_df.apply(
+                lambda x: get_action_interp_with_diag(x, options, grid_params), axis=1
+            )
         else:
-            traj_df = traj_df.apply(lambda x: get_action_interp_reg(x, options, grid_params), axis=1)
+            traj_df = traj_df.apply(
+                lambda x: get_action_interp_reg(x, options, grid_params), axis=1
+            )
 
     # merges the dictionary series
     states_out = []
@@ -413,27 +479,32 @@ def get_action(traj, options, grid_params):
     lon_out = []
     lat_out = []
     for traj in traj_df:
-        states_out += traj['PREV']
-        acts_out += traj['ACT']
-        if options['append_coords']:
-            lon_out += traj['LON']
-            lat_out += traj['LAT']
+        states_out += traj["PREV"]
+        acts_out += traj["ACT"]
+        if options["append_coords"]:
+            lon_out += traj["LON"]
+            lat_out += traj["LAT"]
     states_out.append(last_state)
 
     # appends the final state to each trajectory as its own row to allow for easier plotting of trajectories
-    if options['append_coords']:
+    if options["append_coords"]:
         states_out.append(-1)
         acts_out.append(-1)
         lon_out.append(lon.iloc[-1])
         lat_out.append(lat.iloc[-1])
 
     # instantiates final dataframe-ready dictionary with state-action-state triplets
-    data_out = {'ID': [traj_num] * len(acts_out), 'PREV': states_out[:-1], 'ACT': acts_out, 'CUR': states_out[1:]}
+    data_out = {
+        "ID": [traj_num] * len(acts_out),
+        "PREV": states_out[:-1],
+        "ACT": acts_out,
+        "CUR": states_out[1:],
+    }
 
     # adds coordinate fields for final output if specified in options
-    if options['append_coords']:
-        data_out['LON'] = lon_out
-        data_out['LAT'] = lat_out
+    if options["append_coords"]:
+        data_out["LON"] = lon_out
+        data_out["LAT"] = lat_out
 
     return data_out
 
@@ -475,10 +546,10 @@ def get_action_arb(row, options, grid_params):
         dict: State-action-state triplets that interpolate between ``prev_state`` and ``cur_state``.
     """
     # retrieves transition data
-    traj_num = row['ID'].astype(int)
-    prev_state = row['PREV'].astype(int)
-    cur_state = row['CUR'].astype(int)
-    num_cols = grid_params['num_cols']
+    traj_num = row["ID"].astype(int)
+    prev_state = row["PREV"].astype(int)
+    cur_state = row["CUR"].astype(int)
+    num_cols = grid_params["num_cols"]
 
     # gets row, column decomposition for previous and current states
     prev_row = prev_state // num_cols
@@ -493,7 +564,7 @@ def get_action_arb(row, options, grid_params):
     # the sequence defined by layer corresponds to the total number of grid squares in each spiral layer
     action_num = x = y = i = 0
     layer = (2 * i + 1) ** 2  # sets breakpoint for when to increment i
-    while not(x == rel_col and y == rel_row):
+    while not (x == rel_col and y == rel_row):
         if action_num == layer - 1:
             i += 1  # move to next spiral
             x = i
@@ -511,12 +582,17 @@ def get_action_arb(row, options, grid_params):
         action_num += 1
 
     # prepares final data dictionary to build DataFrame
-    out_data = {'ID': [traj_num, ], 'PREV': [prev_state, ], 'ACT': [action_num, ], 'CUR': [cur_state, ]}
+    out_data = {
+        "ID": [traj_num],
+        "PREV": [prev_state],
+        "ACT": [action_num],
+        "CUR": [cur_state],
+    }
 
     # overwrites the coordinates of the first state in interpolated transitions to be original raw values
-    if options['append_coords']:
-        out_data['LON'] = [row['LON'], ]
-        out_data['LAT'] = [row['LAT'], ]
+    if options["append_coords"]:
+        out_data["LON"] = [row["LON"]]
+        out_data["LAT"] = [row["LAT"]]
 
     return out_data
 
@@ -590,10 +666,10 @@ def get_action_interp_with_diag(row, options, grid_params):
         dict: State-action-state triplets that interpolate between ``prev_state`` and ``cur_state``.
     """
     # retrieves transition data
-    traj_num = row['ID'].astype(int)
-    prev_state = row['PREV'].astype(int)
-    cur_state = row['CUR'].astype(int)
-    num_cols = grid_params['num_cols']
+    traj_num = row["ID"].astype(int)
+    prev_state = row["PREV"].astype(int)
+    cur_state = row["CUR"].astype(int)
+    num_cols = grid_params["num_cols"]
 
     # instantiate lists to hold column values for final DataFrame output
     prevs = []
@@ -613,7 +689,7 @@ def get_action_interp_with_diag(row, options, grid_params):
 
     # write output rows until rel_row and rel_col are both zero
     # out_rows = []
-    while not(rel_row == 0 and rel_col == 0):
+    while not (rel_row == 0 and rel_col == 0):
         # selects action to minimize rel_row and rel_col
         action = -1
         if rel_row > 0 and rel_col > 0:
@@ -651,7 +727,7 @@ def get_action_interp_with_diag(row, options, grid_params):
         curs.append(temp_state)
 
         # gets the coordinates of the interpolated state - will be the coordinates of the middle of the state
-        if options['append_coords']:
+        if options["append_coords"]:
             lon, lat = state_to_coord(prev_state, options, grid_params)
             lons.append(lon)
             lats.append(lat)
@@ -660,14 +736,14 @@ def get_action_interp_with_diag(row, options, grid_params):
         prev_col = temp_col
 
     # prepares final data dictionary to build DataFrame
-    out_data = {'ID': [traj_num] * len(prevs), 'PREV': prevs, 'ACT': acts, 'CUR': curs}
+    out_data = {"ID": [traj_num] * len(prevs), "PREV": prevs, "ACT": acts, "CUR": curs}
 
     # overwrites the coordinates of the first state in interpolated transitions to be original raw values
-    if options['append_coords']:
-        lons[0] = row['LON']
-        lats[0] = row['LAT']
-        out_data['LON'] = lons
-        out_data['LAT'] = lats
+    if options["append_coords"]:
+        lons[0] = row["LON"]
+        lats[0] = row["LAT"]
+        out_data["LON"] = lons
+        out_data["LAT"] = lats
 
     return out_data
 
@@ -740,10 +816,10 @@ def get_action_interp_reg(row, options, grid_params):
         dict: State-action-state triplets that interpolate between ``prev_state`` and ``cur_state``.
     """
     # retrieves transition data
-    traj_num = row['ID'].astype(int)
-    prev_state = row['PREV'].astype(int)
-    cur_state = row['CUR'].astype(int)
-    num_cols = grid_params['num_cols']
+    traj_num = row["ID"].astype(int)
+    prev_state = row["PREV"].astype(int)
+    cur_state = row["CUR"].astype(int)
+    num_cols = grid_params["num_cols"]
 
     # instantiate lists to hold column values for final DataFrame output
     prevs = []
@@ -762,7 +838,7 @@ def get_action_interp_reg(row, options, grid_params):
     rel_col = cur_col - prev_col
 
     # write output rows until rel_row and rel_col are both zero
-    while not(rel_row == 0 and rel_col == 0):
+    while not (rel_row == 0 and rel_col == 0):
         # selects action to reduce the largest of rel_row and rel_col
         action = -1
         if rel_row > 0 and rel_col > 0:
@@ -800,7 +876,7 @@ def get_action_interp_reg(row, options, grid_params):
         curs.append(temp_state)
 
         # gets the coordinates of the interpolated state - will be the coordinates of the middle of the state
-        if options['append_coords']:
+        if options["append_coords"]:
             lon, lat = state_to_coord(prev_state, options, grid_params)
             lons.append(lon)
             lats.append(lat)
@@ -809,14 +885,14 @@ def get_action_interp_reg(row, options, grid_params):
         prev_col = temp_col
 
     # prepares final data dictionary to build DataFrame
-    out_data = {'ID': [traj_num] * len(acts), 'PREV': prevs, 'ACT': acts, 'CUR': curs}
+    out_data = {"ID": [traj_num] * len(acts), "PREV": prevs, "ACT": acts, "CUR": curs}
 
     # overwrites the coordinates of the first state in interpolated transitions to be original raw values
-    if options['append_coords']:
-        lons[0] = row['LON']
-        lats[0] = row['LAT']
-        out_data['LON'] = lons
-        out_data['LAT'] = lats
+    if options["append_coords"]:
+        lons[0] = row["LON"]
+        lats[0] = row["LAT"]
+        out_data["LON"] = lons
+        out_data["LAT"] = lats
 
     return out_data
 
@@ -835,15 +911,21 @@ def state_to_coord(state, options, grid_params):
         tuple: The longitude and latitude representing the middle of the state passed in.
     """
     # calculates the integer state's row and column representation in the grid
-    state_col = state % grid_params['num_cols']
-    state_row = state // grid_params['num_cols']
+    state_col = state % grid_params["num_cols"]
+    state_row = state // grid_params["num_cols"]
 
     # calculates the latitude and longitude corresponding to the middle of the grid square
-    state_lon = round(grid_params['min_lon'] + grid_params['grid_len'] * (state_col + 0.5), options['prec_coords'])
-    state_lat = round(grid_params['min_lat'] + grid_params['grid_len'] * (state_row + 0.5), options['prec_coords'])
+    state_lon = round(
+        grid_params["min_lon"] + grid_params["grid_len"] * (state_col + 0.5),
+        options["prec_coords"],
+    )
+    state_lat = round(
+        grid_params["min_lat"] + grid_params["grid_len"] * (state_row + 0.5),
+        options["prec_coords"],
+    )
 
     return state_lon, state_lat
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

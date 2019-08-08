@@ -1,4 +1,5 @@
 [![Documentation Status](https://readthedocs.org/projects/ais-vessel-data-pipeline/badge/?version=latest)](https://ais-vessel-data-pipeline.readthedocs.io/en/latest/?badge=latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 # AIS-Vessel-Data
 Preprocessing data based on https://marinecadastre.gov/ais/
 

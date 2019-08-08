@@ -12,17 +12,18 @@
 #
 import os
 import sys
-sys.path.insert(0, os.path.abspath('../..'))
+
+sys.path.insert(0, os.path.abspath("../.."))
 
 
 # -- Project information -----------------------------------------------------
 
-project = 'AIS Vessel Data Pipeline'
-copyright = '2019, Connor Hawley'
-author = 'Connor Hawley'
+project = "AIS Vessel Data Pipeline"
+copyright = "2019, Connor Hawley"
+author = "Connor Hawley"
 
 # The full version, including alpha/beta/rc tags
-release = '0.0.1'
+release = "0.0.1"
 
 
 # -- General configuration ---------------------------------------------------
@@ -32,22 +33,22 @@ import sphinx_rtd_theme
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-        'recommonmark',
-        'sphinx.ext.autodoc',
-        'sphinx.ext.doctest',
-        'sphinx.ext.intersphinx',
-        'sphinx.ext.autosummary',
-        'sphinx.ext.mathjax',
-        'sphinx.ext.napoleon',
-        'nbsphinx',
-        'sphinx_rtd_theme',
-        'sphinx_automodapi.automodapi',
+    "recommonmark",
+    "sphinx.ext.autodoc",
+    "sphinx.ext.doctest",
+    "sphinx.ext.intersphinx",
+    "sphinx.ext.autosummary",
+    "sphinx.ext.mathjax",
+    "sphinx.ext.napoleon",
+    "nbsphinx",
+    "sphinx_rtd_theme",
+    "sphinx_automodapi.automodapi",
 ]
 
 numpydoc_show_class_members = False
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+templates_path = ["_templates"]
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -55,10 +56,7 @@ templates_path = ['_templates']
 exclude_patterns = []
 
 # Map file extensions to interpretation type.
-source_suffix = {
-    '.rst': 'restructuredtext',
-    '.md': 'markdown',
-}
+source_suffix = {".rst": "restructuredtext", ".md": "markdown"}
 
 
 # -- Options for HTML output -------------------------------------------------
@@ -66,16 +64,14 @@ source_suffix = {
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'sphinx_rtd_theme'
+html_theme = "sphinx_rtd_theme"
 
-html_theme_options = {
-    'navigation_depth': 3
-}
+html_theme_options = {"navigation_depth": 3}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+html_static_path = ["_static"]
 
 # Don't sort in alphabetical order.
 # autodoc_member_order = 'bysource'
