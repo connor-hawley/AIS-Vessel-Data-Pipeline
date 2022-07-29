@@ -42,7 +42,7 @@ jupyter==1.0.0
 lazy-object-proxy==1.4.1
 markupsafe==1.1.1
 mccabe==0.6.1
-mistune==0.8.4
+mistune==2.0.3
 more-itertools==7.2.0
 nbconvert==5.5.0
 nbformat==4.4.0
